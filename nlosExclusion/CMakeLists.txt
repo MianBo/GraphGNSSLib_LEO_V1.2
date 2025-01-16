@@ -22,6 +22,8 @@ add_message_files(
   Satellite_Info.msg
   exclusionSatNum.msg
   Error.msg
+  LEO_dopp.msg
+  LEO_dopp_Array.msg
 )
 generate_messages(
   DEPENDENCIES 

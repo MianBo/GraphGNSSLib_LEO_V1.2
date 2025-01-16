@@ -87,7 +87,7 @@ def main():
     rospy.init_node('gnss_raw_publisher', anonymous=True)
     pub = rospy.Publisher('/gnss_preprocessor_node/LEOPsrCarRov1', GNSS_Raw_Array, queue_size=25)
     # add by Yixin, Change to your csv
-    csv_file = os.path.expanduser('~/GraphGNSSLib/src/GraphGNSSLib/global_fusion/dataset/2021_0521_0607/StarLink_Whampoa_0521.csv')
+    csv_file = os.path.expanduser('~/GraphGNSSLib_LEO/src/GraphGNSSLib_LEO/global_fusion/dataset/2021_0521_0607/StarLink_Whampoa_0521.csv')
     read_csv_and_publish(csv_file, pub)
     # file_processed = False
     # while not rospy.is_shutdown():
