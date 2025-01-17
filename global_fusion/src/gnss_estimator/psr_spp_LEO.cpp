@@ -118,7 +118,7 @@ class gnssSinglePointPositioning
     std::unique_ptr<message_filters::Subscriber<nlosExclusion::LEO_dopp_Array>> leo_doppler_sub;
     std::unique_ptr<message_filters::TimeSynchronizer<nlosExclusion::GNSS_Raw_Array, nlosExclusion::LEO_dopp_Array>> syncdoppler2LEOPsrRaw;
     
-    ros::Publisher pub_FGO = nh.advertise<nav_msgs::Odometry>("FGO_spp_psr", 100); // 
+    ros::Publisher pub_WLS = nh.advertise<nav_msgs::Odometry>("WLS_spp_psr", 100); // 
     ros::Publisher pub_velocity_from_doppler = nh.advertise<nav_msgs::Odometry>("/gnss_preprocessor_node/LEODopVelRov1", 100); //r;
     std::queue<nlosExclusion::GNSS_Raw_ArrayConstPtr> gnss_raw_buf;
     std::map<double, nlosExclusion::GNSS_Raw_Array> gnss_raw_map;
@@ -131,7 +131,7 @@ class gnssSinglePointPositioning
 
     GNSS_Tools m_GNSS_Tools; // utilities
 
-    nav_msgs::Path fgo_path;
+    nav_msgs::Path wls_path;
 
     int gnss_raw_frame = 0;
     std::vector<double> rover_x;//obtained from solveppmization
@@ -146,6 +146,7 @@ class gnssSinglePointPositioning
     
 public: 
     // from Weisong
+    // var _ variance 1/weight_matrix
     struct pseudorangeFactor
     {
         pseudorangeFactor(std::string sat_sys, double s_g_x, double s_g_y, double s_g_z, double pseudorange, double var)
@@ -328,7 +329,8 @@ public:
         {
             double dop_res[n];
             double velocity[3] = {0};
-             
+            double ENU[3] = {0};
+            
             // Estimate receiver velocity using Doppler shifts for LEO satellites
             estvel_LEO(doppler_shifts, lambdas, n, rs, dts, rr, azel, vsat, velocity, dop_res);
 
@@ -345,7 +347,19 @@ public:
             nav_msgs::Odometry odometry;
             odometry.header.frame_id = "map";
             odometry.child_frame_id = "map";
-            odometry.pose.pose.position.x = current_tow;
+            // add by Yixin
+            odometry.header.stamp = ros::Time::now();// need to change
+            // temporary state of receiver position in ECEF
+            Eigen::Matrix<double, 3, 1> state_matrix;
+            state_matrix << rr[0], rr[1], rr[2];
+            std::cout << "state_matrix: " << state_matrix << std::endl;
+            Eigen::Matrix<double, 3, 1> temp_ENU = m_GNSS_Tools.ecef2enu(ENULlhRef, state_matrix);
+            ENU[0] = temp_ENU(0);
+            ENU[1] = temp_ENU(1);
+            ENU[2] = temp_ENU(2);
+            odometry.pose.pose.position.x = ENU[0];
+            odometry.pose.pose.position.y = ENU[1]; 
+            odometry.pose.pose.position.z = ENU[2];
             odometry.twist.twist.linear.x = velocity[0];
             odometry.twist.twist.linear.y = velocity[1];
             odometry.twist.twist.linear.z = velocity[2];
@@ -382,7 +396,7 @@ public:
     int estvel_LEO(const double* doppler_shifts, const double* lambdas, int n, const double* rs, const double* dts,
                double* rr, double* azel, int* vsat,double* velocity, double* dop_res)
     {
-        double x[4] = {0}, dx[4], Q[16], *v, *H;
+        double x[4] = {2.0, 0.0, 0.0, 0.0}, dx[4], Q[16], *v, *H;
         int i, j, nv;
 
         trace(3, "estvel_LEO  : n=%d\n", n);
@@ -394,7 +408,6 @@ public:
 
             /* doppler residuals */
             nv = resdop_LEO(doppler_shifts, lambdas, n, rs, dts, rr, x, azel, vsat, v, H);
-            std::cout << "doppler residue " << i << "=" << norm(v, nv) << std::endl;
             if (nv < 4) {
                 std::cerr << "Error: not enough valid satellites" << std::endl;
                 return 0;
@@ -415,6 +428,7 @@ public:
             }
         }
         dop_res = v;
+        std::cout << "doppler residue =" << v << std::endl;
         free(v);
         free(H);
     }
@@ -452,7 +466,7 @@ public:
 
         ecef2pos(rr, pos);
         xyz2enu(pos, E);
-
+        
         for (i = 0; i < n && i < MAXOBS; i++) {
             double lam = lambdas[i];
 
@@ -464,6 +478,7 @@ public:
             a[0] = sin(azel[i * 2]) * cosel;
             a[1] = cos(azel[i * 2]) * cosel;
             a[2] = sin(azel[1 + i * 2]);
+            
             matmul("TN", 3, 1, 3, 1.0, E, a, 0.0, e);
 
             /* satellite velocity relative to receiver in ecef */
@@ -474,8 +489,8 @@ public:
                                                     rs[3 + i * 6] * rr[1] - rs[i * 6] * x[1]);
 
             /* doppler residual */
-            v[nv] = -lam * doppler_shifts[i] - (rate + x[3] - CLIGHT * dts[1 + i * 2]);
-
+            v[nv] = -lam * doppler_shifts[i] - (rate+x[3]-CLIGHT*dts[1+i*2]);  //x[3] should be less than 10e-9 changed here
+            // std::cout<< v[nv] << std::endl;
             /* design matrix */
             for (j = 0; j < 4; j++) H[j + nv * 4] = j < 3 ? -e[j] : 1.0;
 
@@ -489,7 +504,7 @@ public:
         while(1)
         {
             // process gnss raw measurements
-            // optimize_mux.lock();
+            optimize_mux.lock();
             if(gnss_raw_map.size() && hasNewData)
             {
                 TicToc optimization_time;
@@ -528,9 +543,9 @@ public:
                                                 m_GNSS_Tools.getAllMeasurements(gnss_data),
                                                 gnss_data, "WLS");
 
-                    state_array[i][0] = 0;
-                    state_array[i][1] = 0;
-                    state_array[i][2] = 0;
+                    state_array[i][0] = 0;// -2419233.0952641154;
+                    state_array[i][1] = 0; // 5385474.751636437;
+                    state_array[i][2] = 0; //2405344.414697726; // ECEF Origin changed by Yixin
                     state_array[i][3] = 0;
                     state_array[i][4] = 0;
 
@@ -587,7 +602,7 @@ public:
                 
                 state<< state_array[length-1][0], state_array[length-1][1], state_array[length-1][2];
                 ENU = m_GNSS_Tools.ecef2enu(ENULlhRef, state);
-                LOG(INFO) << "ENU- FGO-> "<< std::endl<< ENU;
+                LOG(INFO) << "ENU- WLS-> "<< std::endl<< ENU;
                 nav_msgs::Odometry odometry;
                 // odometry.header = pose_msg->header;
                 odometry.header.frame_id = "map";
@@ -600,16 +615,16 @@ public:
                 rover_z.push_back(state(2));
                 // publish the result
                 // ROS_INFO_STREAM("Publishing odometry: " << odometry);
-                pub_FGO.publish(odometry);
+                pub_WLS.publish(odometry);
                 
-                FILE* FGO_trajectory = fopen("psr_spp_node_trajectory.csv", "w+");
-                fgo_path.poses.clear();
+                FILE* WLS_trajectory = fopen("psr_spp_node_trajectory.csv", "w+");
+                wls_path.poses.clear();
                 for(int m = 0;  m < length; m++) // 
                 {
                     state<< state_array[m][0], state_array[m][1], state_array[m][2];
                     ENU = m_GNSS_Tools.ecef2enu(ENULlhRef, state);
-                    fprintf(FGO_trajectory, "%d,%7.5f,%7.5f,%7.5f  \n", m, ENU(0),ENU(1),ENU(2));
-                    fflush(FGO_trajectory);
+                    fprintf(WLS_trajectory, "%d,%7.5f,%7.5f,%7.5f  \n", m, ENU(0),ENU(1),ENU(2));
+                    fflush(WLS_trajectory);
                 }
 
                 std::cout << "Time used for Ceres-solver-> "<<optimization_time.toc()<<std::endl;
