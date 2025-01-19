@@ -163,10 +163,31 @@ sudo -E ./start.bash
 ```
  The directory  ~/shared_dir is created to connect the container and the host . In the container, it is located at  ~/graph1/shared_dir, you can also download the code to shared_dir and compile the program in the container (Recommended for those who are interested in making changes to the source code)
 
+## 6.GNSS-LEO SPP in Whampoa
+The GNSS positioning via pseudorange spp and FGO is validated using static dataset collected near Whampoa of Hong Kong. Several parameters are as follows:
+  - GPS second span: **455342** to **456880**
+  - satellite system: **GPS/BeiDou/Stralink**
+  - Window Size: **Batch**
+  - measurements considered: pseudorange and Doppler measurements
+  - result is saved by default
+    ```c++
+    ~/GraphGNSSLib_LEO/src/global_fusion/FGO_trajectoryllh_psr_dop_fusion.csv
+    ```
+ We provide some simulated LEO data, please enjoy it!
+   ```bash
+  source ~/GraphGNSSLib_LEO/devel/setup.bash
+  # read GNSS raw data, LEO raw data and combine them as ROS topic
+  # the GNSS only spp positioning result will be displayed in rviz
+  roslaunch global_fusion data_Whampoa_20210521_GNSS only.launch
+  # You can record them as rosbag for usage in the following psr_doppler_fusion
+  rosbag record -O gnss_leo_data.bag /gnssLEOmsg_combination_node/GNSS_LEO_PsrCarRov /gnssLEOmsg_combination_node/GNSS_LEO_Dopp_Array
+  # run pseudorange and doppler fusion
+ roslauch  data_Whampoa_20210521_GNSSLEO.launch
+  ```
+ 
 
-
-## 6. Acknowledgements
+## 7. Acknowledgements
 We use [Ceres-solver](http://ceres-solver.org/) for non-linear optimization and [RTKLIB](http://www.rtklib.com/) for GNSS data decoding, etc. Some functions are originated from [VINS-mono](https://github.com/HKUST-Aerial-Robotics/VINS-Mono). The [rviz_satellite](https://github.com/nobleo/rviz_satellite) is used for visualization. If there is any thing inappropriate, please contact me through 17902061r@connect.polyu.hk ([Weisong WEN](https://weisongwen.wixsite.com/weisongwen)). Thank you very much for the maintainance by Mr. Zhong Yihan. 
 
-## 7. License
+## 8. License
 The source code is released under [GPLv3](http://www.gnu.org/licenses/) license. We are still working on improving the code reliability. For any technical issues, please contact Weisong Wen <17902061r@connect.polyu.hk>. For commercial inquiries, please contact Li-ta Hsu <lt.hsu@polyu.edu.hk>.
