@@ -540,7 +540,16 @@ Eigen::MatrixXd enu2ecef(Eigen::MatrixXd originllh, Eigen::MatrixXd enu) // tran
           eH_Matrix(idx, 3) = 1;
           eH_Matrix(idx, 4) = 1;
         }
-
+        else if (PRNisStarlink(prn))
+        {
+          eH_Matrix(idx, 3) = 1;
+          eH_Matrix(idx, 4) = 1;
+        }
+        else
+        {
+          eH_Matrix(idx, 3) = 1;
+          eH_Matrix(idx, 4) = 1;
+        }
         // Making delta pseudorange
         double rcv_clk_bias;
         if (PRNisGPS(prn)){
@@ -550,6 +559,14 @@ Eigen::MatrixXd enu2ecef(Eigen::MatrixXd originllh, Eigen::MatrixXd enu) // tran
         {
           rcv_clk_bias = eWLSSolution(4);
         }
+        else if (PRNisStarlink(prn))
+        {
+          rcv_clk_bias = eWLSSolution(4);
+        }
+        else
+        {
+          rcv_clk_bias = eWLSSolution(4);
+        } 
         // double sv_clk_bias = eExistingSVPositions(idx, 4) * CLIGHT;
         eDeltaPr(idx, 0) = pr - dGeoDistance + rcv_clk_bias;
         //printf("%2d - %f %f %f %f \n", prn, pr, dGeoDistance, eDeltaPr(idx, 0), rcv_clk_bias);
@@ -739,6 +756,14 @@ Eigen::MatrixXd enu2ecef(Eigen::MatrixXd originllh, Eigen::MatrixXd enu) // tran
           rcv_clk_bias = eWLSSolution(3);       
         }
         // else if (PRNisBeidou(prn))
+        else if (PRNisBeidou(prn))
+        {
+          rcv_clk_bias = eWLSSolution(4);
+        }
+        else if (PRNisStarlink(prn))
+        {
+          rcv_clk_bias = eWLSSolution(4);
+        }
         else
         {
           rcv_clk_bias = eWLSSolution(4);

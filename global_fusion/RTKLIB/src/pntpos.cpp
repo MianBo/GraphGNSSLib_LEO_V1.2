@@ -47,6 +47,18 @@
 #include <nlosExclusion/GNSS_Raw_Array.h>
 #include <nlosExclusion/GNSS_Raw.h>
 
+//add by Yixin
+#include <nlosExclusion/LEO_dopp.h>
+#include <nlosExclusion/LEO_dopp_Array.h>
+#include <std_msgs/Header.h> 
+#include <vector> 
+#include <iostream>
+#include <string>
+#include <fstream>
+#include <sstream>
+#include <stdlib.h>
+#include <iomanip>
+
 FILE* gnss_ublox_wls = fopen("gnss_ublox_wls.csv", "w+");
 
 
@@ -71,8 +83,27 @@ ros::Publisher pub_wls_odometry;
 
 ros::Publisher pub_gnss_raw;
 ros::Publisher pub_velocity_from_doppler;
+ros::Publisher pub_doppler;
 
 GNSS_Tools m_GNSS_Tools; // utilities
+
+const ros::Time gps_epoch(315964800, 0); // 315964800 from 1970/1/1 to 1980/1/6
+ros::Time GPSTimeToROSTime(double gps_time) {
+    int gps_week = static_cast<int>(gps_time / 604800);
+    double gps_seconds = gps_time - gps_week * 604800;
+
+    // Calculate the total seconds in ros to the given GPS time
+    double total_seconds = gps_week * 604800 + gps_seconds+ gps_epoch.toSec();    
+
+    // Transform the total seconds to seconds and nanoseconds
+    int64_t sec = static_cast<int64_t>(total_seconds);
+    int64_t nsec = static_cast<int64_t>((total_seconds - sec) * 1e9);
+
+    // Create a ROS time object
+    ros::Time ros_time(sec, nsec);
+    
+    return ros_time;
+}
 
 extern void pntposRegisterPub(ros::NodeHandle &n)
 {
@@ -80,6 +111,7 @@ extern void pntposRegisterPub(ros::NodeHandle &n)
     pub_gnss_raw = n.advertise<nlosExclusion::GNSS_Raw_Array>("GNSSPsrCarRov1", 1000);
     pub_wls_odometry = n.advertise<nav_msgs::Odometry>("WLSENUGoGPS", 1000);
     pub_velocity_from_doppler = n.advertise<nav_msgs::Odometry>("GNSSDopVelRov1", 1000); // velocity_from_doppler
+    pub_doppler = n.advertise<nlosExclusion::LEO_dopp_Array>("GNSS_Dopp_Array", 1000); // velocity_from_doppler
 }
 
 
@@ -649,9 +681,15 @@ extern int pntpos(const obsd_t *obs, int n, const nav_t *nav,
     double epoch_time[100];
     time2epoch(obs[0].time, epoch_time);
 
+    nlosExclusion::LEO_dopp_Array GNSS_dopp_array;
+    nlosExclusion::LEO_dopp gnss_dopp_element;
+    
+
     /* satellite positons, velocities and clocks */
     satposs(sol->time,obs,n,nav,opt_.sateph,rs,dts,var,svh);
-    
+
+
+
     /* estimate receiver position with pseudorange by RTKLIB */
     stat=estpos(obs,n,rs,dts,var,svh,nav,&opt_,sol,azel_,vsat,resp,msg);
 
@@ -725,11 +763,29 @@ extern int pntpos(const obsd_t *obs, int n, const nav_t *nav,
         if(gnss_raw.elevation>15.0)
         {
             gnss_data.GNSS_Raws.push_back(gnss_raw);
+            gnss_data.header.stamp = GPSTimeToROSTime(current_week*604800+current_tow);
             #if 0
             std::cout << "epoch_time-> "<< epoch_time[0]<<"/"<<epoch_time[1]<<"/"<<epoch_time[2]<< " "<<epoch_time[3]<<":"<<epoch_time[4]<<":"<<epoch_time[5]<<std::endl;
             LOG(INFO) << "obs[s_i].P[0];  "<<obs[s_i].P[0];
             LOG(INFO) << "obs[s_i].L[0];  "<<obs[s_i].L[0];
             #endif
+
+            #if 1 // Publish Dopp_Array of GNSS
+            {
+                gnss_dopp_element.GNSS_time = current_tow;
+                gnss_dopp_element.doppler_shifts = obs[s_i].D[0];
+                gnss_dopp_element.lambdas = nav->lam[obs[s_i].sat - 1][0];
+                gnss_dopp_element.n = n;
+                gnss_dopp_element.rs = std::vector<double>(rs + s_i * 6, rs + (s_i + 1) * 6);
+                gnss_dopp_element.dts = std::vector<double>(dts + s_i * 2, dts + (s_i + 1) * 2);
+                gnss_dopp_element.rr = std::vector<double>(sol->rr, sol->rr + 6);
+                gnss_dopp_element.azel = std::vector<double>(azel_ + s_i * 2, azel_ + (s_i + 1) * 2);
+                gnss_dopp_element.vsat = vsat[s_i];
+                GNSS_dopp_array.LEO_Dopps.push_back(gnss_dopp_element);
+                GNSS_dopp_array.header.stamp = GPSTimeToROSTime(current_week*604800+current_tow);
+                
+            }
+            # endif
         }
         else
         {
@@ -765,7 +821,8 @@ extern int pntpos(const obsd_t *obs, int n, const nav_t *nav,
     LOG(INFO) << "CMP_cnt   "<<CMP_cnt;
     
     pub_gnss_raw.publish(gnss_data);
-    
+    pub_doppler.publish(GNSS_dopp_array);
+
     #if 1 // PNT from WLS using Eigen
     {
         Eigen::Matrix<double, 3,1> ENU_ref;

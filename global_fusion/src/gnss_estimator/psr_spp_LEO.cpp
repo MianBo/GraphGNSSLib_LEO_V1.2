@@ -109,17 +109,23 @@ static const char rcsid[]="$Id:$";
 GNSS_Tools m_GNSS_Tools; // utilities
 
 
+
+
+
 class gnssSinglePointPositioning
 {
     ros::NodeHandle nh;
 
     // ros subscriber
-    std::unique_ptr<message_filters::Subscriber<nlosExclusion::GNSS_Raw_Array>> leo_raw_array_sub;
-    std::unique_ptr<message_filters::Subscriber<nlosExclusion::LEO_dopp_Array>> leo_doppler_sub;
+    std::unique_ptr<message_filters::Subscriber<nlosExclusion::GNSS_Raw_Array>> gnss_leo_raw_array_sub;
+    std::unique_ptr<message_filters::Subscriber<nlosExclusion::LEO_dopp_Array>> gnss_leo_doppler_sub;
     std::unique_ptr<message_filters::TimeSynchronizer<nlosExclusion::GNSS_Raw_Array, nlosExclusion::LEO_dopp_Array>> syncdoppler2LEOPsrRaw;
     
     ros::Publisher pub_WLS = nh.advertise<nav_msgs::Odometry>("WLS_spp_psr", 100); // 
-    ros::Publisher pub_velocity_from_doppler = nh.advertise<nav_msgs::Odometry>("/gnss_preprocessor_node/LEODopVelRov1", 100); //r;
+    ros::Publisher pub_velocity_from_doppler = nh.advertise<nav_msgs::Odometry>("/psr_spp_LEO_node/GNSS_LEO_DopVelRov", 20000); //r;
+    
+
+    
     std::queue<nlosExclusion::GNSS_Raw_ArrayConstPtr> gnss_raw_buf;
     std::map<double, nlosExclusion::GNSS_Raw_Array> gnss_raw_map;
     std::queue<nlosExclusion::LEO_dopp_ArrayConstPtr> gnss_doppler_buf;
@@ -143,7 +149,24 @@ class gnssSinglePointPositioning
 
     bool hasNewData =false;
 
-    
+    ros::Time GPSTimeToROSTime(double gps_time) {
+        int gps_week = static_cast<int>(gps_time / 604800);
+        double gps_seconds = gps_time - gps_week * 604800;
+        const ros::Time gps_epoch(315964800, 0); // 315964800 from 1970/1/1 to 1980/1/6
+
+        // Calculate the total seconds in ros to the given GPS time
+        double total_seconds = gps_week * 604800 + gps_seconds+ gps_epoch.toSec();    
+
+        // Transform the total seconds to seconds and nanoseconds
+        int64_t sec = static_cast<int64_t>(total_seconds);
+        int64_t nsec = static_cast<int64_t>((total_seconds - sec) * 1e9);
+
+        // Create a ROS time object
+        ros::Time ros_time(sec, nsec);
+        
+        return ros_time;
+    }
+
 public: 
     // from Weisong
     // var _ variance 1/weight_matrix
@@ -261,12 +284,11 @@ public:
     gnssSinglePointPositioning()
     {
         
-        leo_raw_array_sub.reset(new message_filters::Subscriber<nlosExclusion::GNSS_Raw_Array>(nh, "/gnss_preprocessor_node/LEOPsrCarRov1", 10000));
-        leo_doppler_sub.reset(new message_filters::Subscriber<nlosExclusion::LEO_dopp_Array>(nh, "/gnss_preprocessor_node/LEO_Dopp_Array", 10000));
-        syncdoppler2LEOPsrRaw.reset(new message_filters::TimeSynchronizer<nlosExclusion::GNSS_Raw_Array, nlosExclusion::LEO_dopp_Array>(*leo_raw_array_sub, *leo_doppler_sub, 10000));
+        gnss_leo_raw_array_sub.reset(new message_filters::Subscriber<nlosExclusion::GNSS_Raw_Array>(nh, "/gnssLEOmsg_combination_node/GNSS_LEO_PsrCarRov", 10000));
+        gnss_leo_doppler_sub.reset(new message_filters::Subscriber<nlosExclusion::LEO_dopp_Array>(nh, "/gnssLEOmsg_combination_node/GNSS_LEO_Dopp_Array", 10000));
+        syncdoppler2LEOPsrRaw.reset(new message_filters::TimeSynchronizer<nlosExclusion::GNSS_Raw_Array, nlosExclusion::LEO_dopp_Array>(*gnss_leo_raw_array_sub, *gnss_leo_doppler_sub, 10000));
         syncdoppler2LEOPsrRaw->registerCallback(boost::bind(&gnssSinglePointPositioning::psr_doppler_msg_callback,this, _1, _2));
         optimizationThread = std::thread(&gnssSinglePointPositioning::solvePptimization, this);
-        
         //gnss_raw_array_sub.reset(new message_filters::Subscriber<nlosExclusion::GNSS_Raw_Array>(nh, "/gnss_preprocessor_node/GNSSPsrCarRov1", 10000));
         
 
@@ -348,18 +370,18 @@ public:
             odometry.header.frame_id = "map";
             odometry.child_frame_id = "map";
             // add by Yixin
-            odometry.header.stamp = ros::Time::now();// need to change
+            odometry.header.stamp = GPSTimeToROSTime((2158*604800+current_tow));// need to change
             // temporary state of receiver position in ECEF
             Eigen::Matrix<double, 3, 1> state_matrix;
             state_matrix << rr[0], rr[1], rr[2];
-            std::cout << "state_matrix: " << state_matrix << std::endl;
-            Eigen::Matrix<double, 3, 1> temp_ENU = m_GNSS_Tools.ecef2enu(ENULlhRef, state_matrix);
-            ENU[0] = temp_ENU(0);
-            ENU[1] = temp_ENU(1);
-            ENU[2] = temp_ENU(2);
-            odometry.pose.pose.position.x = ENU[0];
-            odometry.pose.pose.position.y = ENU[1]; 
-            odometry.pose.pose.position.z = ENU[2];
+            // std::cout << "state_matrix: " << state_matrix << std::endl;
+            // Eigen::Matrix<double, 3, 1> temp_ENU = m_GNSS_Tools.ecef2enu(ENULlhRef, state_matrix);
+            // ENU[0] = temp_ENU(0);
+            // ENU[1] = temp_ENU(1);
+            // ENU[2] = temp_ENU(2);
+            odometry.pose.pose.position.x = current_tow;
+            odometry.pose.pose.position.y = 0; 
+            odometry.pose.pose.position.z = 0;
             odometry.twist.twist.linear.x = velocity[0];
             odometry.twist.twist.linear.y = velocity[1];
             odometry.twist.twist.linear.z = velocity[2];
@@ -368,6 +390,7 @@ public:
             odometry.twist.covariance[0] = norm(dop_res, n);
 
             pub_velocity_from_doppler.publish(odometry);
+            
             // free(dop_res); free(velocity); 
             return 1; // Return success status
         }
@@ -428,7 +451,7 @@ public:
             }
         }
         dop_res = v;
-        std::cout << "doppler residue =" << v << std::endl;
+        // std::cout << "doppler residue =" << v << std::endl;
         free(v);
         free(H);
     }
@@ -436,7 +459,7 @@ public:
 
     void pntposRegisterPub(ros::NodeHandle &n)
     {
-        pub_velocity_from_doppler = n.advertise<nav_msgs::Odometry>("LEODopVelRov1", 1000); // velocity_from_doppler
+        pub_velocity_from_doppler = n.advertise<nav_msgs::Odometry>("GNSS_LEO_DopVelRov", 1000); // velocity_from_doppler
     }
 
     // add by Yixin
@@ -487,7 +510,7 @@ public:
             /* range rate with earth rotation correction */
             rate = dot(vs, e, 3) + OMGE / CLIGHT * (rs[4 + i * 6] * rr[0] + rs[1 + i * 6] * x[0] -
                                                     rs[3 + i * 6] * rr[1] - rs[i * 6] * x[1]);
-
+            // std::cout << "Receiver Position = " << rr[0] << ',' << rr[1] << std::endl;
             /* doppler residual */
             v[nv] = -lam * doppler_shifts[i] - (rate+x[3]-CLIGHT*dts[1+i*2]);  //x[3] should be less than 10e-9 changed here
             // std::cout<< v[nv] << std::endl;
@@ -543,9 +566,9 @@ public:
                                                 m_GNSS_Tools.getAllMeasurements(gnss_data),
                                                 gnss_data, "WLS");
 
-                    state_array[i][0] = 0;// -2419233.0952641154;
-                    state_array[i][1] = 0; // 5385474.751636437;
-                    state_array[i][2] = 0; //2405344.414697726; // ECEF Origin changed by Yixin
+                    state_array[i][0] = -2419233.0952641154; // 0
+                    state_array[i][1] = 5385474.751636437; // 0
+                    state_array[i][2] = 2405344.414697726; // 0 ECEF Origin changed by Yixin
                     state_array[i][3] = 0;
                     state_array[i][4] = 0;
 
@@ -599,10 +622,12 @@ public:
                 // std::cout << summary.BriefReport() << "\n";
                 Eigen::Matrix<double ,3,1> ENU;
                 Eigen::Matrix<double, 3,1> state;
-                
+                Eigen::Matrix<double ,3,1> LLH;
                 state<< state_array[length-1][0], state_array[length-1][1], state_array[length-1][2];
                 ENU = m_GNSS_Tools.ecef2enu(ENULlhRef, state);
+                LLH = m_GNSS_Tools.ecef2llh(state);
                 LOG(INFO) << "ENU- WLS-> "<< std::endl<< ENU;
+                LOG(INFO) << "ENU- LLH-> "<< std::endl<< LLH;
                 nav_msgs::Odometry odometry;
                 // odometry.header = pose_msg->header;
                 odometry.header.frame_id = "map";
@@ -616,7 +641,13 @@ public:
                 // publish the result
                 // ROS_INFO_STREAM("Publishing odometry: " << odometry);
                 pub_WLS.publish(odometry);
-                
+                std::vector<double> doppler_shifts;
+                std::vector<double> lambdas;
+                std::vector<double> rs;
+                std::vector<double> dts;
+                std::vector<double> azel;
+                std::vector<int> vsat;
+                double rr[6]={0};
                 FILE* WLS_trajectory = fopen("psr_spp_node_trajectory.csv", "w+");
                 wls_path.poses.clear();
                 for(int m = 0;  m < length; m++) // 
@@ -632,21 +663,14 @@ public:
                 for(int m = 1;  m <= length; m++) 
                 {
                     //add by Yixin
-                    double rr[6];
-                    rr[0] = rover_x[m];
-                    rr[1] = rover_y[m];
-                    rr[2] = rover_z[m];
                     // double *doppler_shifts,*lambdas,*rs,*dts,*var,*azel,*vsat;
                     // int n = leo_dopp_msg->LEO_Dopps.size();
                     // rs=mat(6,n); dts=mat(2,n); var=mat(1,n); azel=zeros(2,n); 
                     // doppler_shifts=mat(n,1); lambdas=mat(n,1); vsat=mat(n,1);
                     // 整合LEO_dopp_Array中的数据
-                    std::vector<double> doppler_shifts;
-                    std::vector<double> lambdas;
-                    std::vector<double> rs;
-                    std::vector<double> dts;
-                    std::vector<double> azel;
-                    std::vector<int> vsat;
+                    rr[0] = state_array[m-1][0];
+                    rr[1] = state_array[m-1][1];
+                    rr[2] = state_array[m-1][2];
                     nlosExclusion::LEO_dopp_Array leo_dopp_data = gnss_doppler_map[m];
                     for (int i=0; i< leo_dopp_data.LEO_Dopps.size();i++) {
                         doppler_shifts.push_back(leo_dopp_data.LEO_Dopps[i].doppler_shifts);
@@ -676,6 +700,14 @@ public:
         }
     }
 
+//     void publishLEOOdometry(const ros::TimerEvent&)
+//     {
+//         if (!odometry_queue.empty())
+//         {
+//             pub_velocity_from_doppler.publish(odometry_queue.front());
+//             odometry_queue.pop();
+//         }
+//     }
 };
 
 int main(int argc, char **argv)

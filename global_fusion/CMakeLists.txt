@@ -114,6 +114,18 @@ target_link_libraries(LEO_raw_publisher_node ${catkin_LIBRARIES} ${CERES_LIBRARI
 						stream streamsvr tle
 						libGeographiccc) 
 
+add_executable(gnssLEOmsg_combination_node 
+	src/gnss_preprocessor/gnssLEOmsg_combination.cpp
+	./RTKLIB/src/rtkpos.cpp
+	./RTKLIB/src/postpos.cpp
+	./RTKLIB/src/ppp.c)
+target_link_libraries(gnssLEOmsg_combination_node ${catkin_LIBRARIES} ${CERES_LIBRARIES} 
+						convkml convrnx datum download ephemeris geoid ionex lambda
+						options pntpos postpos ppp_ar ppp preceph qzslex rcvraw rinex
+						rtcm rtcm2 rtcm3 rtcm3e rtkcmn rtkpos rtksvr sbas solution
+						stream streamsvr tle
+						libGeographiccc) 
+						
 add_executable(rosbag_generator_node 
 	src/gnss_preprocessor/rosbag_generator.cpp
 	./RTKLIB/src/rtkpos.cpp

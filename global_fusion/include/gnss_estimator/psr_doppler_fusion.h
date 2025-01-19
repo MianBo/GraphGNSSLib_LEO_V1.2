@@ -310,15 +310,16 @@ public:
                 double s_g_x = 0, s_g_y = 0,s_g_z = 0, var = 1;
                 double pseudorange = 0;
                 if(m_GNSS_Tools.PRNisGPS(gnss_data.GNSS_Raws[i].prn_satellites_index)) sat_sys = "GPS";
-                else sat_sys = "BeiDou";
-
+                else if (m_GNSS_Tools.PRNisBeidou(gnss_data.GNSS_Raws[i].prn_satellites_index)) sat_sys = "BeiDou";
+                else if (m_GNSS_Tools.PRNisStarlink(gnss_data.GNSS_Raws[i].prn_satellites_index)) sat_sys = "Starlink";
+                else sat_sys = "";
                 s_g_x = gnss_data.GNSS_Raws[i].sat_pos_x;
                 s_g_y = gnss_data.GNSS_Raws[i].sat_pos_y;
                 s_g_z = gnss_data.GNSS_Raws[i].sat_pos_z;
 
                 pseudorange = gnss_data.GNSS_Raws[i].pseudorange;
 
-                double ele = gnss_data.GNSS_Raws[i].elevation;
+                double ele = gnss_data.GNSS_Raws[i].elevation; // in degree
                 double snr = gnss_data.GNSS_Raws[i].snr;
 
                 ceres::CostFunction* ps_function = new ceres::AutoDiffCostFunction<pseudorangeFactor, 1 

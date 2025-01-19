@@ -69,7 +69,7 @@ Visualization Manager:
       Enabled: true
       Frame Convention: XYZ -> ENU
       Name: AerialMapDisplay
-      Object URI: https://tile.openstreetmap.org/{z}/{x}/{y}.png
+      Object URI: http://mt3.google.com/vt/lyrs=s&x={x}&y={y}&z={z}
       Topic: /gps/fix
       Value: true
       Zoom: 18

@@ -43,7 +43,14 @@ struct pseudorangeFactor
         {
             est_pseudorange = est_pseudorange - state[4];
         }
-
+        else if(sat_sys == "Starlink") 
+        {
+            est_pseudorange = est_pseudorange;
+        }
+        else
+        {
+            est_pseudorange = est_pseudorange - state[4];
+        }
         residuals[0] = (est_pseudorange - T(pseudorange)) / T(var);
         // std::cout << "residuals[0]-> "<< residuals[0]<<std::endl;
 
