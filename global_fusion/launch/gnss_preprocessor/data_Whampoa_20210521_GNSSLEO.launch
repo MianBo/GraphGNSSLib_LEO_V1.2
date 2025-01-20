@@ -16,7 +16,7 @@ This data is starts from the seaside of hong hom to TST -->
     
     <!-- open the Rviz together with the OpenStreetMap -->
     <node pkg="rviz" type="rviz" name="rviz" output="screen" 
-      args="-d $(find global_fusion)/rviz/psr_spp_LEO.rviz" required="true">
+      args="-d $(find global_fusion)/rviz/gnss_positioning.rviz" required="true">
     </node>
     <node pkg="rostopic" type="rostopic" name="fake_gps_fix" args="pub /gps/fix sensor_msgs/NavSatFix --latch --file=$(find rviz_satellite)/launch/demo_Whampoa.gps" />
     <!-- Static fake TF transform -->
