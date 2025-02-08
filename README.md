@@ -182,7 +182,7 @@ The GNSS positioning via pseudorange spp and FGO is validated using static datas
   # You can record them as rosbag for usage in the following psr_doppler_fusion
   rosbag record -O gnss_leo_data.bag /gnssLEOmsg_combination_node/GNSS_LEO_PsrCarRov /gnssLEOmsg_combination_node/GNSS_LEO_Dopp_Array
   # run pseudorange and doppler fusion
- roslauch  data_Whampoa_20210521_GNSSLEO.launch
+ roslaunch  data_Whampoa_20210521_GNSSLEO.launch
   ```
  
 
