@@ -17,6 +17,8 @@
 #include <assert.h>
 #define ENACMP 1 // enable BeiDou
 
+//FILE* gnss_only_wls = fopen("/home/gao-yixin/GraphGNSSLib_LEO/src/global_fusion/dataset/2021_0521_0607/GNSS_only_WLS_result.csv", "w+"); // add by Yixin
+
 extern void postposRegisterPub(ros::NodeHandle &n);
 extern void rtkposRegisterPub(ros::NodeHandle &n);
 extern void pntposRegisterPub(ros::NodeHandle &n);

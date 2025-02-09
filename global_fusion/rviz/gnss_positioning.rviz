@@ -7,11 +7,12 @@ Panels:
         - /Status1
         - /Ground Truth1/Shape1
         - /GNSS-LEO-WLSENURTKLIB(Green)1/Shape1
-        - /GNSS-WLSENUGoGPS(Yellow)1/Shape1
-        - /GNSS-RTKENURTKLIB(Red)1
-        - /GNSS-RTKENURTKLIB(Red)1/Status1
-        - /GNSS-RTKENURTKLIB(Red)1/Shape1
+        - /GNSS-only-WLSENUGoGPS(Yellow)1/Shape1
+        - /GNSS-only-RTKENURTKLIB(Red)1
+        - /GNSS-only-RTKENURTKLIB(Red)1/Shape1
         - /FGOPath1/Offset1
+        - /GNSS-only-WLSENURTKLIB(Blue)1
+        - /GNSS-only-WLSENURTKLIB(Blue)1/Shape1
       Splitter Ratio: 0.7911227345466614
     Tree Height: 1088
   - Class: rviz/Selection
@@ -72,7 +73,7 @@ Visualization Manager:
       Enabled: true
       Frame Convention: XYZ -> ENU
       Name: AerialMapDisplay
-      Object URI: http://mt3.google.com/vt/lyrs=s&x={x}&y={y}&z={z}
+      Object URI: http://mt2.google.com/vt/lyrs=p&x={x}&y={y}&z={z}
       Topic: /gps/fix
       Value: true
       Zoom: 18
@@ -163,7 +164,7 @@ Visualization Manager:
         Value: true
       Enabled: true
       Keep: 10000
-      Name: GNSS-WLSENUGoGPS(Yellow)
+      Name: GNSS-only-WLSENUGoGPS(Yellow)
       Position Tolerance: 0.10000000149011612
       Shape:
         Alpha: 1
@@ -197,7 +198,7 @@ Visualization Manager:
         Value: true
       Enabled: true
       Keep: 10000
-      Name: GNSS-RTKENURTKLIB(Red)
+      Name: GNSS-only-RTKENURTKLIB(Red)
       Position Tolerance: 0.10000000149011612
       Shape:
         Alpha: 1
@@ -281,6 +282,40 @@ Visualization Manager:
       Topic: /WLS_path
       Unreliable: false
       Value: true
+    - Angle Tolerance: 0.10000000149011612
+      Class: rviz/Odometry
+      Covariance:
+        Orientation:
+          Alpha: 0.5
+          Color: 255; 255; 127
+          Color Style: Unique
+          Frame: Local
+          Offset: 1
+          Scale: 1
+          Value: true
+        Position:
+          Alpha: 0.30000001192092896
+          Color: 204; 51; 204
+          Scale: 1
+          Value: true
+        Value: true
+      Enabled: true
+      Keep: 10000
+      Name: GNSS-only-WLSENURTKLIB(Blue)
+      Position Tolerance: 0.10000000149011612
+      Shape:
+        Alpha: 1
+        Axes Length: 1
+        Axes Radius: 0.10000000149011612
+        Color: 18; 197; 229
+        Head Length: 2
+        Head Radius: 1
+        Shaft Length: 2
+        Shaft Radius: 3
+        Value: Arrow
+      Topic: /gnss_preprocessor_node/WLSENURTKLIB
+      Unreliable: false
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 255; 255; 255
@@ -318,11 +353,11 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 1.4566508531570435
+      Scale: 3.1738202571868896
       Target Frame: <Fixed Frame>
       Value: TopDownOrtho (rviz)
-      X: -336.7312316894531
-      Y: 442.84259033203125
+      X: -32.185707092285156
+      Y: 27.687538146972656
     Saved: ~
 Window Geometry:
   Displays:

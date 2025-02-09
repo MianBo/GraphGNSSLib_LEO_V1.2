@@ -64,7 +64,7 @@ void processCSVData(const std::vector<std::vector<std::string>>& data, ros::Publ
     nlosExclusion::LEO_dopp leo_dopp_element;
     gnss_raw_array.header = std_msgs::Header();
     leo_dopp_array.header = std_msgs::Header();
-    ros::Rate rate(5);  // 2.5 Hz
+    ros::Rate rate(2.5);  // 2.5 Hz
     std::cout << "Starting GNSS Preprocessor..." << std::endl;
     std::cout << "Total lines of data: " << data.size() << std::endl;
     size_t i = 0;

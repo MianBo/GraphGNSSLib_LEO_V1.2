@@ -535,6 +535,7 @@ public:
             ECEF<< state_array[m][0],state_array[m][1],state_array[m][2];
 
             Eigen::Matrix<double,3,1> llh = m_GNSS_Tools.ecef2llh(ECEF);
+            Eigen::Matrix<double,3,1> ENU = m_GNSS_Tools.ecef2enu(ENULlhRef, ECEF);
             int gps_sec = state_gps_sec_vec[m];
 
             /* gps time */
@@ -546,7 +547,10 @@ public:
             foutC.precision(10);
             foutC<<llh(1)<<",";
             foutC<<llh(0)<<",";
-            foutC<<llh(2)<<std::endl;
+            foutC<<llh(2)<<",";
+            foutC<<ENU(0)<<",";
+            foutC<<ENU(1)<<",";
+            foutC<<ENU(2)<<std::endl;
         }
         foutC.close();
     }

@@ -1,5 +1,5 @@
 /*******************************************************
- * Copyright (C) 2025, Intelligent Positioning and Navigation Lab, Hong Kong Polytechnic University
+ * Copyright (C) 2025,Trustworthy Autonomous Systems (TAS) Laboratory , Hong Kong Polytechnic University
  * 
  * This file is part of GraphGNSSLib.
  * Licensed under the GNU General Public License v3.0;
@@ -85,7 +85,7 @@ DEFINE_double(range_stddev, 0.01, "The standard deviation of range readings of "
 static const int kStride = 10;
 
 
-FILE* gnss_ublox_wls = fopen("gnss_ublox_wls.csv", "w+");
+FILE* WLS_trajectory = fopen("/home/gao-yixin/GraphGNSSLib_LEO/src/global_fusion/dataset/2021_0521_0607/GNSS_LEO_psr_spp_result.csv", "w+");
 
 
 static const char rcsid[]="$Id:$";
@@ -126,10 +126,10 @@ class gnssSinglePointPositioning
     
 
     
-    std::queue<nlosExclusion::GNSS_Raw_ArrayConstPtr> gnss_raw_buf;
-    std::map<double, nlosExclusion::GNSS_Raw_Array> gnss_raw_map;
-    std::queue<nlosExclusion::LEO_dopp_ArrayConstPtr> gnss_doppler_buf;
-    std::map<double, nlosExclusion::LEO_dopp_Array> gnss_doppler_map;
+    std::queue<nlosExclusion::GNSS_Raw_ArrayConstPtr> gnss_leo_raw_buf;
+    std::map<double, nlosExclusion::GNSS_Raw_Array> gnss_leo_raw_map;
+    std::queue<nlosExclusion::LEO_dopp_ArrayConstPtr> gnss_leo_doppler_buf;
+    std::map<double, nlosExclusion::LEO_dopp_Array> gnss_leo_doppler_map;
 
     std::mutex m_gnss_raw_mux;
     std::mutex optimize_mux;
@@ -305,22 +305,22 @@ public:
 
    /**
    * @brief pseudorange and doppler msg callback
-   * @param leo_psr_msg and leo_dopp_msg
+   * @param gnss_leo_psr_msg and gnss_leo_dopp_msg
    * @return void
    @ 
    */
 
-    void psr_doppler_msg_callback(const nlosExclusion::GNSS_Raw_ArrayConstPtr& leo_psr_msg, const nlosExclusion::LEO_dopp_ArrayConstPtr& leo_dopp_msg)
+    void psr_doppler_msg_callback(const nlosExclusion::GNSS_Raw_ArrayConstPtr& gnss_leo_psr_msg, const nlosExclusion::LEO_dopp_ArrayConstPtr& gnss_leo_dopp_msg)
     {
         std::lock_guard<std::mutex> lock(m_gnss_raw_mux);
         gnss_frame++;
-        if (leo_psr_msg->GNSS_Raws.size())
+        if (gnss_leo_psr_msg->GNSS_Raws.size())
         {
             hasNewData = true;
-            gnss_raw_buf.push(leo_psr_msg);
-            gnss_raw_map[gnss_frame] = *leo_psr_msg;
-            gnss_doppler_buf.push(leo_dopp_msg);
-            gnss_doppler_map[gnss_frame] = *leo_dopp_msg;
+            gnss_leo_raw_buf.push(gnss_leo_psr_msg);
+            gnss_leo_raw_map[gnss_frame] = *gnss_leo_psr_msg;
+            gnss_leo_doppler_buf.push(gnss_leo_dopp_msg);
+            gnss_leo_doppler_map[gnss_frame] = *gnss_leo_dopp_msg;
             
              
         }
@@ -528,7 +528,7 @@ public:
         {
             // process gnss raw measurements
             optimize_mux.lock();
-            if(gnss_raw_map.size() && hasNewData)
+            if(gnss_leo_raw_map.size() && hasNewData)
             {
                 TicToc optimization_time;
                 ceres::Problem problem;
@@ -544,7 +544,7 @@ public:
                 // loss_function = new ceres::HuberLoss(1.0);
                 loss_function = NULL;
                 
-                int length = gnss_raw_map.size();
+                int length = gnss_leo_raw_map.size();
                 double state_array[length][5]; // ECEF_x, ECEF_y, ECEF_z, ECEF_gps_clock_bias, ECEF_beidou_clock_bias
                 // std::vector<double*> parameter_blocks;
                 // std::vector<double*> state_array;
@@ -557,14 +557,14 @@ public:
                 // }
 
                 std::map<double, nlosExclusion::GNSS_Raw_Array>::iterator iter;
-                iter = gnss_raw_map.begin();
+                iter = gnss_leo_raw_map.begin();
                 for(int i = 0;  i < length; i++,iter++) // initialize
                 {
-                    nlosExclusion::GNSS_Raw_Array gnss_data = (iter->second);
+                    nlosExclusion::GNSS_Raw_Array gnss_leo_data = (iter->second);
                     Eigen::MatrixXd eWLSSolutionECEF = m_GNSS_Tools.WeightedLeastSquare(
-                                                m_GNSS_Tools.getAllPositions(gnss_data),
-                                                m_GNSS_Tools.getAllMeasurements(gnss_data),
-                                                gnss_data, "WLS");
+                                                m_GNSS_Tools.getAllPositions(gnss_leo_data),
+                                                m_GNSS_Tools.getAllMeasurements(gnss_leo_data),
+                                                gnss_leo_data, "WLS");
 
                     state_array[i][0] = -2419233.0952641154; // 0
                     state_array[i][1] = 5385474.751636437; // 0
@@ -576,14 +576,14 @@ public:
                 }
 
                 std::map<double, nlosExclusion::GNSS_Raw_Array>::iterator iter_pr;
-                iter_pr = gnss_raw_map.begin();
+                iter_pr = gnss_leo_raw_map.begin();
                 for(int m = 0;  m < length; m++,iter_pr++) // 
                 {
-                    nlosExclusion::GNSS_Raw_Array gnss_data = (iter_pr->second);
+                    nlosExclusion::GNSS_Raw_Array gnss_leo_data = (iter_pr->second);
                     MatrixXd weight_matrix; //goGPS weighting
-                    weight_matrix = m_GNSS_Tools.cofactorMatrixCal_WLS(gnss_data, "WLS"); //goGPS
+                    weight_matrix = m_GNSS_Tools.cofactorMatrixCal_WLS(gnss_leo_data, "WLS"); //goGPS
                     // std::cout << "weight_matrix: rows = " << weight_matrix.rows() << ", cols = " << weight_matrix.cols() << std::endl;//add by Yixin
-                    int sv_cnt = gnss_data.GNSS_Raws.size();
+                    int sv_cnt = gnss_leo_data.GNSS_Raws.size();
                     // state_array[m] = new double[5]; //
                     // double a[5] = {1,2,3,4,5};
                     // state_array[m] = a;
@@ -592,16 +592,16 @@ public:
                         std::string sat_sys;
                         double s_g_x = 0, s_g_y = 0,s_g_z = 0, var = 1;
                         double pseudorange = 0;
-                        if(m_GNSS_Tools.PRNisGPS(gnss_data.GNSS_Raws[i].prn_satellites_index)) sat_sys = "GPS";
-                        else if (m_GNSS_Tools.PRNisBeidou(gnss_data.GNSS_Raws[i].prn_satellites_index))  sat_sys = "BeiDou";
-                        else if (m_GNSS_Tools.PRNisStarlink(gnss_data.GNSS_Raws[i].prn_satellites_index)) sat_sys = "Starlink";
+                        if(m_GNSS_Tools.PRNisGPS(gnss_leo_data.GNSS_Raws[i].prn_satellites_index)) sat_sys = "GPS";
+                        else if (m_GNSS_Tools.PRNisBeidou(gnss_leo_data.GNSS_Raws[i].prn_satellites_index))  sat_sys = "BeiDou";
+                        else if (m_GNSS_Tools.PRNisStarlink(gnss_leo_data.GNSS_Raws[i].prn_satellites_index)) sat_sys = "Starlink";
                         else  sat_sys = "Unknown";
 
-                        s_g_x = gnss_data.GNSS_Raws[i].sat_pos_x;
-                        s_g_y = gnss_data.GNSS_Raws[i].sat_pos_y;
-                        s_g_z = gnss_data.GNSS_Raws[i].sat_pos_z;
+                        s_g_x = gnss_leo_data.GNSS_Raws[i].sat_pos_x;
+                        s_g_y = gnss_leo_data.GNSS_Raws[i].sat_pos_y;
+                        s_g_z = gnss_leo_data.GNSS_Raws[i].sat_pos_z;
 
-                        pseudorange = gnss_data.GNSS_Raws[i].pseudorange;
+                        pseudorange = gnss_leo_data.GNSS_Raws[i].pseudorange;
                         
                         ceres::CostFunction* ps_function = new ceres::AutoDiffCostFunction<pseudorangeFactor, 1 
                                                                 , 5>(new 
@@ -647,14 +647,18 @@ public:
                 std::vector<double> dts;
                 std::vector<double> azel;
                 std::vector<int> vsat;
+                double current_tow = 0;
                 double rr[6]={0};
-                FILE* WLS_trajectory = fopen("psr_spp_node_trajectory.csv", "w+");
+                FILE* WLS_trajectory = fopen("/home/gao-yixin/GraphGNSSLib_LEO/src/global_fusion/dataset/2021_0521_0607/GNSS_LEO_psr_spp_result.csv", "w+");
                 wls_path.poses.clear();
                 for(int m = 0;  m < length; m++) // 
                 {
+                    nlosExclusion::GNSS_Raw_Array gnss_leo_data = gnss_leo_raw_map[m+1];
                     state<< state_array[m][0], state_array[m][1], state_array[m][2];
+                    current_tow = gnss_leo_data.GNSS_Raws[0].GNSS_time;
                     ENU = m_GNSS_Tools.ecef2enu(ENULlhRef, state);
-                    fprintf(WLS_trajectory, "%d,%7.5f,%7.5f,%7.5f  \n", m, ENU(0),ENU(1),ENU(2));
+                    LLH = m_GNSS_Tools.ecef2llh(state);
+                    fprintf(WLS_trajectory, "%d,%d,%7.5f,%7.5f,%7.5f,%7.5f,%7.5f,%7.5f  \n", 2158,int(current_tow), LLH(1),LLH(0),LLH(2),ENU(0),ENU(1),ENU(2));
                     fflush(WLS_trajectory);
                 }
 
@@ -664,26 +668,26 @@ public:
                 {
                     //add by Yixin
                     // double *doppler_shifts,*lambdas,*rs,*dts,*var,*azel,*vsat;
-                    // int n = leo_dopp_msg->LEO_Dopps.size();
+                    // int n = gnss_leo_dopp_msg->LEO_Dopps.size();
                     // rs=mat(6,n); dts=mat(2,n); var=mat(1,n); azel=zeros(2,n); 
                     // doppler_shifts=mat(n,1); lambdas=mat(n,1); vsat=mat(n,1);
                     // 整合LEO_dopp_Array中的数据
                     rr[0] = state_array[m-1][0];
                     rr[1] = state_array[m-1][1];
                     rr[2] = state_array[m-1][2];
-                    nlosExclusion::LEO_dopp_Array leo_dopp_data = gnss_doppler_map[m];
-                    for (int i=0; i< leo_dopp_data.LEO_Dopps.size();i++) {
-                        doppler_shifts.push_back(leo_dopp_data.LEO_Dopps[i].doppler_shifts);
-                        lambdas.push_back(leo_dopp_data.LEO_Dopps[i].lambdas);
-                        rs.insert(rs.end(), leo_dopp_data.LEO_Dopps[i].rs.begin(), leo_dopp_data.LEO_Dopps[i].rs.end());
-                        dts.insert(dts.end(), leo_dopp_data.LEO_Dopps[i].dts.begin(), leo_dopp_data.LEO_Dopps[i].dts.end());
-                        azel.insert(azel.end(), leo_dopp_data.LEO_Dopps[i].azel.begin(), leo_dopp_data.LEO_Dopps[i].azel.end());
-                        vsat.push_back(leo_dopp_data.LEO_Dopps[i].vsat);
+                    nlosExclusion::LEO_dopp_Array gnss_leo_dopp_data = gnss_leo_doppler_map[m];
+                    for (int i=0; i< gnss_leo_dopp_data.LEO_Dopps.size();i++) {
+                        doppler_shifts.push_back(gnss_leo_dopp_data.LEO_Dopps[i].doppler_shifts);
+                        lambdas.push_back(gnss_leo_dopp_data.LEO_Dopps[i].lambdas);
+                        rs.insert(rs.end(), gnss_leo_dopp_data.LEO_Dopps[i].rs.begin(), gnss_leo_dopp_data.LEO_Dopps[i].rs.end());
+                        dts.insert(dts.end(), gnss_leo_dopp_data.LEO_Dopps[i].dts.begin(), gnss_leo_dopp_data.LEO_Dopps[i].dts.end());
+                        azel.insert(azel.end(), gnss_leo_dopp_data.LEO_Dopps[i].azel.begin(), gnss_leo_dopp_data.LEO_Dopps[i].azel.end());
+                        vsat.push_back(gnss_leo_dopp_data.LEO_Dopps[i].vsat);
                     }
 
 
-                    pntpos_LEO(leo_dopp_data.LEO_Dopps[0].GNSS_time, doppler_shifts.data(), lambdas.data(),
-                        leo_dopp_data.LEO_Dopps.size(),rs.data(), dts.data(), rr,
+                    pntpos_LEO(gnss_leo_dopp_data.LEO_Dopps[0].GNSS_time, doppler_shifts.data(), lambdas.data(),
+                        gnss_leo_dopp_data.LEO_Dopps.size(),rs.data(), dts.data(), rr,
                         azel.data(), vsat.data());
                 }
 
@@ -694,7 +698,7 @@ public:
             
             std::chrono::milliseconds dura(10); // this thread sleep for 100 ms
             std::this_thread::sleep_for(dura);
-            // gnss_raw_map.clear();
+            // gnss_leo_raw_map.clear();
             optimize_mux.unlock();
             
         }
@@ -716,7 +720,7 @@ int main(int argc, char **argv)
     google::InitGoogleLogging(argv[0]); // init the google logging
     // google::ParseCommandLineFlags(&argc, &argv, true); // parseCommandLineFlags 
     ros::init(argc, argv, "psr_spp_LEO_node");  
-    ROS_INFO("\033[1;32m----> psr_spp_node (solve WLS using Ceres-solver) Started.\033[0m");
+    ROS_INFO("\033[1;32m----> psr_spp_LEO_node (solve WLS using Ceres-solver) Started.\033[0m");
     gnssSinglePointPositioning gnssSinglePointPositioning;
     ros::spin();
     return 0;

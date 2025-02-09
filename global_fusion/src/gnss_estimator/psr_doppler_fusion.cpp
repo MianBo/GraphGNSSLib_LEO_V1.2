@@ -131,7 +131,11 @@ public:
     {
         /* setup logpath */
         ros::param::get("logPath", logPath);
-
+        if (!ros::param::get("logPath", logPath))
+        {
+            logPath = "/home/gao-yixin/GraphGNSSLib_LEO/src/global_fusion/dataset/2021_0521_0607/FGO_trajectoryllh_psr_dop_fusion.csv";
+        }
+        std::cout << "logPath-> "<< logPath<< std::endl;
         /* thread for factor graph optimization */
         optimizationThread = std::thread(&psr_doppler_fusion::solveOptimization, this);
         

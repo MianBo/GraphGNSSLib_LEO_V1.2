@@ -16,8 +16,10 @@ This data is starts from the seaside of hong hom to TST -->
       <param name="nf"      type="int" value="2" />
       <param name="soltype"  type="int" value="0" />
     </node>
+
     <node name="LEO_raw_publisher_node" output="screen" pkg="global_fusion" type="LEO_raw_publisher_node"/>
     <node name="gnssLEOmsg_combination" pkg="global_fusion" type="gnssLEOmsg_combination_node" output="screen"/>
+    
     <!-- open the Rviz together with the OpenStreetMap -->
     <node pkg="rviz" type="rviz" name="rviz" output="screen" 
       args="-d $(find global_fusion)/rviz/gnss_positioning.rviz" required="true">

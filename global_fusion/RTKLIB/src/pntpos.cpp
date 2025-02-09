@@ -59,7 +59,7 @@
 #include <stdlib.h>
 #include <iomanip>
 
-FILE* gnss_ublox_wls = fopen("gnss_ublox_wls.csv", "w+");
+FILE* gnss_only_wls = fopen("/home/gao-yixin/GraphGNSSLib_LEO/src/global_fusion/dataset/2021_0521_0607/GNSS_only_WLS_result.csv", "w+");
 
 
 static const char rcsid[]="$Id:$";
@@ -931,17 +931,16 @@ extern int pntpos(const obsd_t *obs, int n, const nav_t *nav,
         odometry.twist.twist.linear.y = sol->rr[4];
         odometry.twist.twist.linear.z = sol->rr[5];
         pub_pntpos_odometry.publish(odometry);
-
-        if((int(current_tow) > start_gps_sec) && (int(current_tow) < end_gps_sec))
-        {
-            double pos[3];
-            double rr[3]={sol->rr[0], sol->rr[1], sol->rr[2]};
-            ecef2pos(sol->rr,pos);
-            fprintf(gnss_ublox_wls, "%d,%d,%7.9f,%7.9f,%7.9f,", 2096, int(current_tow),pos[0]*R2D,pos[1]*R2D,pos[2]);
-            fprintf(gnss_ublox_wls, "%7.9f,%7.9f,%7.9f \n", sol->qr[0], sol->qr[1],sol->qr[2]);
-            fflush(gnss_ublox_wls);
-        }
+        FILE* gnss_only_wls = fopen("/home/gao-yixin/GraphGNSSLib_LEO/src/global_fusion/dataset/2021_0521_0607/GNSS_only_WLS_result.csv", "a+");
+        double pos[3];
         
+        double rr[3]={sol->rr[0], sol->rr[1], sol->rr[2]};
+        ECEF<<sol->rr[0], sol->rr[1], sol->rr[2];
+        ENU=m_GNSS_Tools.ecef2enu(ENU_ref, ECEF);
+        ecef2pos(sol->rr,pos);
+        fprintf(gnss_only_wls, "%d,%d,%.9f,%.9f,%.9f,", 2158, int(current_tow),pos[0]*R2D,pos[1]*R2D,pos[2]);
+        fprintf(gnss_only_wls, "%.9f,%.9f,%.9f \n", ENU[0], ENU[1],ENU[2]);
+        fflush(gnss_only_wls);
 
     }
     #endif
