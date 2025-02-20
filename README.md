@@ -22,7 +22,7 @@ The package is based on **[GraphGNSSLib](https://github.com/weisongwen/GraphGNSS
 *if you use GraphGNSSLib_LEO for your academic research, please cite our related [papers](https://ieeexplore.ieee.org/abstract/document/9562037)*
 
 <p align="center">
-  <img width="712pix" src="img/software_flowchart.png">
+  <img width="712pix" src="img/LEO-GNSS FGO.png">
 </p>
 
 <center> Software flowchart of GraphGNSSLib_LEO, more information please refer to mannual and paper.</center>
