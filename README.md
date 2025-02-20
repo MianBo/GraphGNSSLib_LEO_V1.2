@@ -74,42 +74,8 @@ catkin_make
 ```
 (**if you fail in this step, try to find another computer with clean system or reinstall Ubuntu and ROS**)
 
-## 3. Run GNSS-LEO positioning using dataset [UrbanNav](https://www.polyu-ipn-lab.com/download)   
-The GNSS-LEO positioning via FGO is validated using static dataset collected near TST of Hong Kong. Several parameters are as follows:
-  - GPS second span: **46701** to **47185**
-  - satellite system: **GPS/BeiDou**
-  - Window Size: **Batch**
-  - measurements considered: double-differenced pseudorange and carrier-phase measurements, Doppler measurements
-  - result is saved by default
-    ```c++
-    ~/GraphGNSSLib/trajectory_psr_dop_fusion.csv
-    ```
 
-please enable the following in rtklib.h
-```bash
-#define RTK_FGO 0
-```
-- Solution 1 to run the GNSS positioning Demo
-  ```bash
-  source ~/GraphGNSSLib/devel/setup.bash
-  # read GNSS raw data and publish as ROS topic
-  # we provide several datasets, enjoy it!
-  roslaunch global_fusion dataublox_TST20190428.launch
-  # run pseudorange and doppler fusion
-  roslaunch global_fusion psr_doppler_fusion.launch
-  ```
-<p align="center">
-  <img width="712pix" src="img/SPP_trajectory1.png">
-</p>
-<center> Trajectories of three methods (GNSS positioning using WLS with the red curve, GNSS positioning using EKF with the green curve, and GNSS positioning using FGO with blue curve throughout the test. The x-axis and y-axis denote the east and north directions, respectively</center>
-
-<p align="center">
-  <img width="712pix" src="img/TSTData.gif">
-</p>
-<center> TST data collected by the Smartphone: Red dots from WLS, purple curve from FGO</center>
-
-
-## 6.Run GNSS-LEO positioning using dataset collected in Whampoa [UrbanNav-HK-Deep-Urban-1](https://github.com/IPNL-POLYU/UrbanNavDataset)   
+## 3.Run GNSS-LEO positioning using dataset collected in Whampoa [UrbanNav-HK-Deep-Urban-1](https://github.com/IPNL-POLYU/UrbanNavDataset)   
 The GNSS-LEO positioning via SPP and FGO is validated using static dataset collected near Whampoa of Hong Kong. Several parameters are as follows:
   - GPS second span: **455342** to **456880**
   - satellite system: **GPS/BeiDou/Stralink**
@@ -133,15 +99,45 @@ The GNSS-LEO positioning via SPP and FGO is validated using static dataset colle
   # run pseudorange and doppler fusion
   roslaunch global_fusion data_Whampoa_20210521_GNSSLEO.launch
   ```
-  The positioning results with different mathods are displayed in rviz:
-  - GNSS only positioning using SPP with the blue arrow in topic **/gnss_preprocessor_node/WLSENURTKLIB**
+
+<p align="center">
+  <video width="948pix" src="img/lightmap-GNSS-LEO-ezgif.com-video-speed.mp4">
+</p>
+
+The positioning results with different mathods are displayed in rviz:
+  - GNSS only positioning using SPP with the blue arrow in topic **/gnss_preprocessor_node/WLSENURTKLIB** 
+  The result is recorded in `GNSS_only_WLS_result.csv`
   - GNSS only positioning using RTK with the red arrow in topic **/gnss_preprocessor_node/ENUIntegerRTK**
   - GNSS and LEO positioning using SPP with the green arrow in topic **/WLS_spp_psr**
+  The result is recorded in `GNSS_LEO_psr_spp_result.csv`
   - GNSS positioning using FGO with purple curve in topic **/FGOGlobalPath**. 
+  The result is recorded in `FGO_trajectoryllh_psr_dop_fusion.csv`
   
+Please modify the file path for the result to suit your requirements.
+
+<p align="center">
+  <img width="712pix" src="img/Whampoa Positioning Results.png">
+</p>
+
+Trajectories of three methods (GNSS-only SPP using pseudorange measurements with orange line, GNSS-LEO SPP positioning using pseudorange measurements with yellow line, and GNSS-LEO FGO positioning using pseudorange and doppler shift measurements with purple line. The x-axis and y-axis denote the east and north directions, respectively.
+
+
+<p align="center">
+  <img width="712pix" src="img/Whampoa Positioning Error.png">
+</p>
+
+Positioning Error of Different method: Orange dots from GNSS-only SPP, Yellow dots from GNSS-LEO SPP, Purple dots from GNSS-LEO FGO.
+
+
 
 ## 7. Acknowledgements
-We use [Ceres-solver](http://ceres-solver.org/) for non-linear optimization and [RTKLIB](http://www.rtklib.com/) for GNSS data decoding, etc. Some functions are originated from [VINS-mono](https://github.com/HKUST-Aerial-Robotics/VINS-Mono). The [rviz_satellite](https://github.com/nobleo/rviz_satellite) is used for visualization. If there is any thing inappropriate, please contact me through 17902061r@connect.polyu.hk ([Weisong WEN](https://weisongwen.wixsite.com/weisongwen)). Thank you very much for the maintainance by Mr. Zhong Yihan. 
+We use [Ceres-solver](http://ceres-solver.org/) for non-linear optimization and [RTKLIB](http://www.rtklib.com/) for GNSS data decoding, etc. Some functions are originated from [VINS-mono](https://github.com/HKUST-Aerial-Robotics/VINS-Mono). The [rviz_satellite](https://github.com/nobleo/rviz_satellite) is used for visualization. We based GNSS FGO proposed in [GraphGNSSLib](https://github.com/weisongwen/GraphGNSSLib) for positioning.
+
+If there is any thing inappropriate, please contact [Yixin GAO](https://polyu-taslab.github.io/members/gao_yixin.html) through yixin.gao@connect.polyu.hk or [Weisong WEN](https://weisongwen.wixsite.com/weisongwen) through welson.wen@polyu.edu.hk.
 
 ## 8. License
-The source code is released under [GPLv3](http://www.gnu.org/licenses/) license. We are still working on improving the code reliability. For any technical issues, please contact Weisong Wen <17902061r@connect.polyu.hk>. For commercial inquiries, please contact Li-ta Hsu <lt.hsu@polyu.edu.hk>.
+The source code is released under [GPLv3](http://www.gnu.org/licenses/) license. We are still working on improving the code reliability. 
+
+For any technical issues, please contact Yixin GAO <yixin.gao@connect.polyu.hk>, from the [Trustworthy AI and Autonomous Systems (TAS) Laboratory]([https://polyu-taslab.github.io/]), The Hong Kong Polytechnic University. 
+
+For commercial inquiries, please contact Weisong WEN <welson.wen@polyu.edu.hk>, from the [Trustworthy AI and Autonomous Systems (TAS) Laboratory]([https://polyu-taslab.github.io/]), The Hong Kong Polytechnic University. 
