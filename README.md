@@ -101,10 +101,14 @@ The GNSS-LEO positioning via SPP and FGO is validated using static dataset colle
   ```
 
 <p align="center">
-  <video width="948pix" src="img/lightmap-GNSS-LEO-ezgif.com-video-speed.mp4">
+  <img width="712pix" src="img/lightmap-GNSS-LEO.gif">
 </p>
+<center>
+The positioning results with different mathods are displayed in rviz.
+</center>
 
-The positioning results with different mathods are displayed in rviz:
+
+
   - GNSS only positioning using SPP with the blue arrow in topic **/gnss_preprocessor_node/WLSENURTKLIB** 
   The result is recorded in `GNSS_only_WLS_result.csv`
   - GNSS only positioning using RTK with the red arrow in topic **/gnss_preprocessor_node/ENUIntegerRTK**
