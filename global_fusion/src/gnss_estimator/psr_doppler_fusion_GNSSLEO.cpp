@@ -133,25 +133,25 @@ public:
         ros::param::get("logPath", logPath);
         if (!ros::param::get("logPath", logPath))
         {
-            logPath = "/home/gao-yixin/GraphGNSSLib_LEO/src/global_fusion/dataset/2021_0521_0607/GNSS_only_FGO_trajectoryllh_psr_dop_fusion.csv";
+            logPath = "/home/gao-yixin/GraphGNSSLib_LEO/src/global_fusion/dataset/2021_0521_0607/GNSSLEO_FGO_trajectoryllh_psr_dop_fusion.csv"; // change to your path
         }
         std::cout << "logPath-> "<< logPath<< std::endl;
         /* thread for factor graph optimization */
         optimizationThread = std::thread(&psr_doppler_fusion::solveOptimization, this);
         
-        pub_WLSENU = nh.advertise<nav_msgs::Odometry>("WLSGoGPS", 100); // 
-        pub_FGOENU = nh.advertise<nav_msgs::Odometry>("FGO", 100); //  
-        pub_fgo_llh = nh.advertise<sensor_msgs::NavSatFix>("fgo_llh", 100);
+        pub_WLSENU = nh.advertise<nav_msgs::Odometry>("WLSGoGPS_GNSSLEO", 100); // 
+        pub_FGOENU = nh.advertise<nav_msgs::Odometry>("FGO_GNSSLEO", 100); //  
+        pub_fgo_llh = nh.advertise<sensor_msgs::NavSatFix>("fgo_llh_GNSSLEO", 100);
 
-        gnss_raw_array_sub.reset(new message_filters::Subscriber<nlosExclusion::GNSS_Raw_Array>(nh, "/gnss_preprocessor_node/GNSSPsrCarRov1", 10000));// GNSS only
-        doppler_sub.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh, "/gnss_preprocessor_node/GNSSDopVelRov1", 10000));// GNSS only
-        //gnss_raw_array_sub.reset(new message_filters::Subscriber<nlosExclusion::GNSS_Raw_Array>(nh, "/gnssLEOmsg_combination_node/GNSS_LEO_PsrCarRov", 10000));// GNSS+LEO
-        //doppler_sub.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh, "/psr_spp_LEO_node/GNSS_LEO_DopVelRov", 10000));// GNSS+LEO
+        //gnss_raw_array_sub.reset(new message_filters::Subscriber<nlosExclusion::GNSS_Raw_Array>(nh, "/gnss_preprocessor_node/GNSSPsrCarRov1", 10000));// GNSS only
+        //doppler_sub.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh, "/gnss_preprocessor_node/GNSSDopVelRov1", 10000));// GNSS only
+        gnss_raw_array_sub.reset(new message_filters::Subscriber<nlosExclusion::GNSS_Raw_Array>(nh, "/gnssLEOmsg_combination_node/GNSS_LEO_PsrCarRov", 10000));// GNSS+LEO
+        doppler_sub.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh, "/psr_spp_LEO_node/GNSS_LEO_DopVelRov", 10000));// GNSS+LEO
         syncdoppler2GNSSRaw.reset(new message_filters::TimeSynchronizer<nlosExclusion::GNSS_Raw_Array, nav_msgs::Odometry>(*gnss_raw_array_sub, *doppler_sub, 10000));
 
         syncdoppler2GNSSRaw->registerCallback(boost::bind(&psr_doppler_fusion::gnssraw_doppler_msg_callback,this, _1, _2));
 
-        pub_global_path = nh.advertise<nav_msgs::Path>("/FGOGlobalPath", 100); // 
+        pub_global_path = nh.advertise<nav_msgs::Path>("/GNSS_LEO_FGOGlobalPath", 100); // 
         
         /* reference point for ENU calculation */
         ENU_ref<< ref_lon, ref_lat, ref_alt;

@@ -11,9 +11,12 @@ This data is starts from the seaside of hong hom to TST -->
     </node>
     
     <node name="psr_doppler_fusion_node" pkg="global_fusion" type="psr_doppler_fusion_node" output="screen" >
-        <param name="logPath" type="string"  value="$(find global_fusion)/dataset/2021_0521_0607/FGO_trajectoryllh_psr_dop_fusion.csv" />
+        <param name="logPath" type="string"  value="$(find global_fusion)/dataset/2021_0521_0607/GNSSonly_FGO_trajectoryllh_psr_dop_fusion.csv" />
     </node>
     
+    <node name="psr_doppler_fusion_GNSSLEO_node" pkg="global_fusion" type="psr_doppler_fusion_GNSSLEO_node" output="screen" >
+        <param name="logPath" type="string"  value="$(find global_fusion)/dataset/2021_0521_0607/GNSSLEO_FGO_trajectoryllh_psr_dop_fusion.csv" />
+    </node>
     <!-- open the Rviz together with the OpenStreetMap -->
     <node pkg="rviz" type="rviz" name="rviz" output="screen" 
       args="-d $(find global_fusion)/rviz/gnss_positioning.rviz" required="true">

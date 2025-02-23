@@ -178,6 +178,18 @@ target_link_libraries(psr_doppler_fusion_node ${catkin_LIBRARIES} ${CERES_LIBRAR
 						stream streamsvr tle
 						libGeographiccc) 
 
+add_executable(psr_doppler_fusion_GNSSLEO_node 
+	src/gnss_estimator/psr_doppler_fusion_GNSSLEO.cpp
+	./RTKLIB/src/rtkpos.cpp
+	./RTKLIB/src/postpos.cpp
+	./RTKLIB/src/ppp.c)
+target_link_libraries(psr_doppler_fusion_GNSSLEO_node ${catkin_LIBRARIES} ${CERES_LIBRARIES} 
+						convkml convrnx datum download ephemeris geoid ionex lambda
+						options pntpos postpos ppp_ar ppp preceph qzslex rcvraw rinex
+						rtcm rtcm2 rtcm3 rtcm3e rtkcmn rtkpos rtksvr sbas solution
+						stream streamsvr tle
+						libGeographiccc) 
+																		
 add_executable(psr_doppler_car_rtk_node 
 	src/gnss_estimator/psr_doppler_car_rtk.cpp
 	./RTKLIB/src/rtkpos.cpp

@@ -210,7 +210,7 @@ public:
   gnssSinglePointPositioning()
   {
       gnss_raw_sub = nh.subscribe("/gnss_preprocessor_node/GNSSPsrCarRov1", 500, &gnssSinglePointPositioning::gnss_raw_msg_callback, this); // call callback for gnss raw msg
-      leo_raw_sub = nh.subscribe("/gnss_preprocessor_node/LEOPsrCarRov1", 500, &gnssSinglePointPositioning::gnss_raw_msg_callback, this); // call callback for leo raw msg add by Yixin
+      //leo_raw_sub = nh.subscribe("/gnss_preprocessor_node/LEOPsrCarRov1", 500, &gnssSinglePointPositioning::gnss_raw_msg_callback, this); // call callback for leo raw msg add by Yixin
       optimizationThread = std::thread(&gnssSinglePointPositioning::solvePptimization, this);
 
       pub_WLS = nh.advertise<nav_msgs::Odometry>("WLS_spp", 100); // 

@@ -128,7 +128,7 @@ public:
         // ENU_ref<< 114.179526047,22.3304807923 ,11.7615366792;
         // ENULlhRef.resize(3,1);
         ENU_ref<< ref_lon, ref_lat, ref_alt;
-
+        //ENU_ref<< 114.190305193, 22.301575393, 5.4704; // Changed acccording to Whampoa Position
         getSolutionfromCSV();
         getGroundTruthSolutionfromCSV();
         evaluateSol();
@@ -184,7 +184,7 @@ public:
                     result.push_back(substr);
                     std::cout << std::setprecision(17);
                 }
-                Solution_.gps_week =strtod((result[0]).c_str(), NULL);
+                Solution_.gps_week =2158; //strtod((result[0]).c_str(), NULL);
                 Solution_.gps_sec =strtod((result[1]).c_str(), NULL);
 
                 Solution_.latitude = strtod((result[2]).c_str(), NULL);

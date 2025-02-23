@@ -370,7 +370,7 @@ public:
             odometry.header.frame_id = "map";
             odometry.child_frame_id = "map";
             // add by Yixin
-            odometry.header.stamp = GPSTimeToROSTime((2158*604800+current_tow));// need to change
+            odometry.header.stamp = GPSTimeToROSTime((2158*604800+current_tow));// need to change according to your week
             // temporary state of receiver position in ECEF
             Eigen::Matrix<double, 3, 1> state_matrix;
             state_matrix << rr[0], rr[1], rr[2];

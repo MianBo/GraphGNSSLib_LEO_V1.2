@@ -876,6 +876,7 @@ extern int pntpos(const obsd_t *obs, int n, const nav_t *nav,
     nav_msgs::Odometry odometry;
     odometry.header.frame_id = "map";
     odometry.child_frame_id = "map";
+    odometry.header.stamp = GPSTimeToROSTime((current_week*604800+current_tow));
     odometry.pose.pose.position.x = current_tow;
     odometry.twist.twist.linear.x = sol->rr[3];
     odometry.twist.twist.linear.y = sol->rr[4];
