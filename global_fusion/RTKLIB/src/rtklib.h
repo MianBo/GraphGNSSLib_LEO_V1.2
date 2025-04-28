@@ -1712,7 +1712,8 @@ extern void rtkfree(rtk_t *rtk);
 extern int  rtkpos (rtk_t *rtk, const obsd_t *obs, int nobs, const nav_t *nav);
 extern int  rtkopenstat(const char *file, int level);
 extern void rtkclosestat(void);
-
+extern void initializeRTKFolder(void);
+extern void initializeWLSFolder(void);
 /* precise point positioning -------------------------------------------------*/
 extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav);
 extern int pppamb(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav,

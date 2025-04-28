@@ -402,9 +402,9 @@ static void procpos(FILE *fp, const prcopt_t *popt, const solopt_t *sopt,
         }
         // LOG(INFO)<<"n-> "<<n;
         if (n<=0) continue;
-        
+       
         if (!rtkpos(&rtk,obs,n,&navs)) continue;
-        
+
         if (mode==0) { /* forward/backward */
             if (!solstatic) {
                 outsol(fp,&rtk.sol,rtk.rb,sopt);
@@ -995,7 +995,7 @@ static int execses(gtime_t ts, gtime_t te, double ti, const prcopt_t *popt,
     // LOG(INFO)<<"--------------start readobsnav--------------";wait(2);
     ROS_INFO("\033[1;32m----> start readobsnav.\033[0m");wait(2);
     if (!readobsnav(ts,te,ti,infile,index,n,&popt_,&obss,&navs,stas)) return 0;
-    
+
     /* set antenna paramters */
     if (popt_.mode!=PMODE_SINGLE) {
         /* set antenna parameters */
@@ -1114,7 +1114,7 @@ static int execses_r(gtime_t ts, gtime_t te, double ti, const prcopt_t *popt,
                 }
                 for (i=0;i<n;i++) reppath(infile[i],ifile[i],t0,p,"");
                 reppath(outfile,ofile,t0,p,"");
-                
+ 
                 /* execute processing session */
                 stat=execses(ts,te,ti,popt,sopt,fopt,flag,ifile,index,n,ofile);
             }
@@ -1140,13 +1140,14 @@ static int execses_b(gtime_t ts, gtime_t te, double ti, const prcopt_t *popt,
     char *ifile[MAXINFILE],ofile[1024],*base_,*p,*q,s[64];
     
     trace(3,"execses_b: n=%d outfile=%s\n",n,outfile);
-    
+
     /* read prec ephemeris and sbas data */
     readpreceph(infile,n,popt,&navs,&sbss,&lexs);
     
     for (i=0;i<n;i++) if (strstr(infile[i],"%b")) break;
     
     if (i<n) { /* include base station keywords */
+
         if (!(base_=(char *)malloc(strlen(base)+1))) {
             freepreceph(&navs,&sbss,&lexs);
             return 0;
@@ -1180,7 +1181,9 @@ static int execses_b(gtime_t ts, gtime_t te, double ti, const prcopt_t *popt,
         free(base_); for (i=0;i<n;i++) free(ifile[i]);
     }
     else {
+
         stat=execses_r(ts,te,ti,popt,sopt,fopt,flag,infile,index,n,outfile,rov);
+
     }
     /* free prec ephemeris and sbas data */
     freepreceph(&navs,&sbss,&lexs);
@@ -1261,7 +1264,7 @@ extern int postpos(gtime_t ts, gtime_t te, double ti, double tu,
     double tunit,tss;
     int i,j,k,nf,stat=0,week,flag=1,index[MAXINFILE]={0};
     char *ifile[MAXINFILE],ofile[1024],*ext;
-    
+
     trace(3,"postpos : ti=%.0f tu=%.0f n=%d outfile=%s\n",ti,tu,n,outfile);
     
     
@@ -1270,26 +1273,29 @@ extern int postpos(gtime_t ts, gtime_t te, double ti, double tu,
     /* pcvsr: satellite antenna parameters */
     if (!openses(popt,sopt,fopt,&navs,&pcvss,&pcvsr)) return -1;
     
-    
+
     if (ts.time!=0&&te.time!=0&&tu>=0.0) { // if start != 0
         if (timediff(te,ts)<0.0) {
             showmsg("error : no period");
             closeses(&navs,&pcvss,&pcvsr);
             return 0;
         }
+
         for (i=0;i<MAXINFILE;i++) {
             if (!(ifile[i]=(char *)malloc(1024))) {
                 for (;i>=0;i--) free(ifile[i]);
+
                 closeses(&navs,&pcvss,&pcvsr);
                 return -1;
             }
         }
+
         if (tu==0.0||tu>86400.0*MAXPRCDAYS) tu=86400.0*MAXPRCDAYS;
         settspan(ts,te);
         tunit=tu<86400.0?tu:86400.0;
         tss=tunit*(int)floor(time2gpst(ts,&week)/tunit);
         
-        
+
         for (i=0;;i++) { /* for each periods */
             tts=gpst2time(week,tss+i*tu);
             tte=timeadd(tts,tu-DTTOL);
@@ -1340,6 +1346,7 @@ extern int postpos(gtime_t ts, gtime_t te, double ti, double tu,
         for (i=0;i<MAXINFILE;i++) free(ifile[i]);
     }
     else if (ts.time!=0) {
+
         for (i=0;i<n&&i<MAXINFILE;i++) {
             if (!(ifile[i]=(char *)malloc(1024))) {
                 for (;i>=0;i--) free(ifile[i]);
@@ -1349,7 +1356,7 @@ extern int postpos(gtime_t ts, gtime_t te, double ti, double tu,
             index[i]=i;
         }
         reppath(outfile,ofile,ts,"","");
-        
+
         /* execute processing session */
         stat=execses_b(ts,te,ti,popt,sopt,fopt,1,ifile,index,n,ofile,rov,
                        base);
@@ -1357,6 +1364,7 @@ extern int postpos(gtime_t ts, gtime_t te, double ti, double tu,
         for (i=0;i<n&&i<MAXINFILE;i++) free(ifile[i]);
     }
     else {
+
         for (i=0;i<n;i++) index[i]=i;
         
         /* execute processing session */
@@ -1365,7 +1373,7 @@ extern int postpos(gtime_t ts, gtime_t te, double ti, double tu,
     }
     /* close processing session */
     closeses(&navs,&pcvss,&pcvsr);
-    
+
     return stat;
 }
 

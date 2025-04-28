@@ -15,9 +15,10 @@
 #include <ros/ros.h>
 #include <stdio.h>
 #include <assert.h>
-#define ENACMP 1 // enable BeiDou
+#define ENACMP 1 //enable BeiDou
+#define ENAGAL 1 //enable GAL
+#define ENAGLO 1 //enable GLO
 
-//FILE* gnss_only_wls = fopen("/home/gao-yixin/GraphGNSSLib_LEO/src/global_fusion/dataset/2021_0521_0607/GNSS_only_WLS_result.csv", "w+"); // add by Yixin
 
 extern void postposRegisterPub(ros::NodeHandle &n);
 extern void rtkposRegisterPub(ros::NodeHandle &n);
@@ -42,7 +43,7 @@ int main(int argc, char **argv)
 	ros::param::get("BeiDouEmpFile", BeiDouEmpFile);
 	ros::param::get("GPSEmpFile", GPSEmpFile);
 	ros::param::get("out_folder", out_folder);
-
+	
 	/* flag for state */
     int n=0,i,stat;
 
@@ -50,7 +51,8 @@ int main(int argc, char **argv)
 	postposRegisterPub(nh);
 	rtkposRegisterPub(nh);
 	pntposRegisterPub(nh);
-
+	initializeRTKFolder();
+	initializeWLSFolder();
 	/* processing time setting */
 	double ti=0.0;						// processing interval  (s) (0:all)
 	double tu=0.0;						// unit time (s) (0:all)
@@ -92,7 +94,7 @@ int main(int argc, char **argv)
 
 	/* set input files */
 	for (i=0;i<10;i++) infile[i]=infile_[i];
-
+	
 	strcpy(infile[n++],strdup(roverMeasureFile.c_str()));
 	strcpy(infile[n++],strdup(baseMeasureFile.c_str()));
 	strcpy(infile[n++],strdup(BeiDouEmpFile.c_str()));
@@ -115,7 +117,7 @@ int main(int argc, char **argv)
 	{
 		/* decode the RINEX file positioning */
 		stat=postpos(ts,te,ti,tu,&prcopt,&solopt,&filopt,infile,n,outfile,rov,base);
-
+		
 		printf("\n");
 		if(stat==0){
 			ROS_INFO("\033[1;32m----> gnss_preprocessor Finished.\033[0m");

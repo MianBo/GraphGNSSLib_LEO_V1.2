@@ -8,6 +8,7 @@ set(CMAKE_CXX_FLAGS "-std=c++14")
 # C++ 14 is required
 add_definitions(-std=c++14)
 set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 #-DEIGEN_USE_MKL_ALL")
 #set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g")
@@ -27,7 +28,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
-  nlosExclusion
+  nlosexclusion
 )
 
 find_package(Ceres REQUIRED)
@@ -53,12 +54,12 @@ add_library(ephemeris RTKLIB/src/ephemeris.c)
 add_library(geoid RTKLIB/src/geoid.c)
 add_library(ionex RTKLIB/src/ionex.c)
 add_library(lambda RTKLIB/src/lambda.cpp)
-add_dependencies(lambda nlosExclusion_gencpp)
+add_dependencies(lambda nlosexclusion_gencpp)
 add_library(options RTKLIB/src/options.c)
 add_library(pntpos RTKLIB/src/pntpos.cpp)
-add_dependencies(pntpos nlosExclusion_gencpp)
+add_dependencies(pntpos nlosexclusion_gencpp)
 add_library(postpos RTKLIB/src/postpos.cpp)
-add_dependencies(postpos nlosExclusion_gencpp)
+add_dependencies(postpos nlosexclusion_gencpp)
 add_library(ppp_ar RTKLIB/src/ppp_ar.c)
 add_library(ppp RTKLIB/src/ppp.c)
 add_library(preceph RTKLIB/src/preceph.c)
@@ -71,23 +72,13 @@ add_library(rtcm3 RTKLIB/src/rtcm3.c)
 add_library(rtcm3e RTKLIB/src/rtcm3e.c)
 add_library(rtkcmn RTKLIB/src/rtkcmn.c)
 add_library(rtkpos RTKLIB/src/rtkpos.cpp)
-add_dependencies(rtkpos nlosExclusion_gencpp)
+add_dependencies(rtkpos nlosexclusion_gencpp)
 add_library(rtksvr RTKLIB/src/rtksvr.c)
 add_library(sbas RTKLIB/src/sbas.c)
 add_library(solution RTKLIB/src/solution.c)
 add_library(stream RTKLIB/src/stream.c)
 add_library(streamsvr RTKLIB/src/streamsvr.c)
 add_library(tle RTKLIB/src/tle.c)
-
-add_executable(testRTKLIBNode 
-	src/testRTKLIBNode.cpp)
-target_link_libraries(testRTKLIBNode ${catkin_LIBRARIES} ${CERES_LIBRARIES} 
-						convkml convrnx datum download ephemeris geoid ionex lambda
-						options pntpos postpos ppp_ar ppp preceph qzslex rcvraw rinex
-						rtcm rtcm2 rtcm3 rtcm3e rtkcmn rtkpos rtksvr sbas solution
-						stream streamsvr tle
-						libGeographiccc) 
-
 
 
 add_executable(gnss_preprocessor_node 
@@ -102,24 +93,36 @@ target_link_libraries(gnss_preprocessor_node ${catkin_LIBRARIES} ${CERES_LIBRARI
 						stream streamsvr tle
 						libGeographiccc) 
 
-add_executable(LEO_raw_publisher_node 
-	src/gnss_preprocessor/LEO_raw_publisher.cpp
+add_executable(leo_rover_raw_publisher_node 
+	src/leo_preprocessor/leo_rover_raw_publisher.cpp
 	./RTKLIB/src/rtkpos.cpp
 	./RTKLIB/src/postpos.cpp
 	./RTKLIB/src/ppp.c)
-target_link_libraries(LEO_raw_publisher_node ${catkin_LIBRARIES} ${CERES_LIBRARIES} 
+target_link_libraries(leo_rover_raw_publisher_node ${catkin_LIBRARIES} ${CERES_LIBRARIES} 
 						convkml convrnx datum download ephemeris geoid ionex lambda
 						options pntpos postpos ppp_ar ppp preceph qzslex rcvraw rinex
 						rtcm rtcm2 rtcm3 rtcm3e rtkcmn rtkpos rtksvr sbas solution
 						stream streamsvr tle
 						libGeographiccc) 
 
-add_executable(gnssLEOmsg_combination_node 
-	src/gnss_preprocessor/gnssLEOmsg_combination.cpp
+add_executable(leo_station_raw_publisher_node 
+	src/leo_preprocessor/leo_station_raw_publisher.cpp
 	./RTKLIB/src/rtkpos.cpp
 	./RTKLIB/src/postpos.cpp
 	./RTKLIB/src/ppp.c)
-target_link_libraries(gnssLEOmsg_combination_node ${catkin_LIBRARIES} ${CERES_LIBRARIES} 
+target_link_libraries(leo_station_raw_publisher_node ${catkin_LIBRARIES} ${CERES_LIBRARIES} 
+						convkml convrnx datum download ephemeris geoid ionex lambda
+						options pntpos postpos ppp_ar ppp preceph qzslex rcvraw rinex
+						rtcm rtcm2 rtcm3 rtcm3e rtkcmn rtkpos rtksvr sbas solution
+						stream streamsvr tle
+						libGeographiccc) 
+
+add_executable(gnss_leo_msg_combination_node 
+	src/leo_preprocessor/gnss_leo_msg_combination.cpp
+	./RTKLIB/src/rtkpos.cpp
+	./RTKLIB/src/postpos.cpp
+	./RTKLIB/src/ppp.c)
+target_link_libraries(gnss_leo_msg_combination_node ${catkin_LIBRARIES} ${CERES_LIBRARIES} 
 						convkml convrnx datum download ephemeris geoid ionex lambda
 						options pntpos postpos ppp_ar ppp preceph qzslex rcvraw rinex
 						rtcm rtcm2 rtcm3 rtcm3e rtkcmn rtkpos rtksvr sbas solution
@@ -147,9 +150,9 @@ target_link_libraries(psr_spp_node ${catkin_LIBRARIES} ${CERES_LIBRARIES}
 						stream streamsvr tle
 						libGeographiccc) 
 
-add_executable(psr_spp_LEO_node 
-	src/gnss_estimator/psr_spp_LEO.cpp)
-target_link_libraries(psr_spp_LEO_node ${catkin_LIBRARIES} ${CERES_LIBRARIES} 
+add_executable(psr_spp_gnssleo_node 
+	src/gnss_estimator/psr_spp_gnssleo.cpp)
+target_link_libraries(psr_spp_gnssleo_node ${catkin_LIBRARIES} ${CERES_LIBRARIES} 
 						convkml convrnx datum download ephemeris geoid ionex lambda
 						options pntpos postpos ppp_ar ppp preceph qzslex rcvraw rinex
 						rtcm rtcm2 rtcm3 rtcm3e rtkcmn rtkpos rtksvr sbas solution
@@ -178,12 +181,12 @@ target_link_libraries(psr_doppler_fusion_node ${catkin_LIBRARIES} ${CERES_LIBRAR
 						stream streamsvr tle
 						libGeographiccc) 
 
-add_executable(psr_doppler_fusion_GNSSLEO_node 
-	src/gnss_estimator/psr_doppler_fusion_GNSSLEO.cpp
+add_executable(psr_doppler_fusion_gnssleo_node 
+	src/gnss_estimator/psr_doppler_fusion_gnssleo.cpp
 	./RTKLIB/src/rtkpos.cpp
 	./RTKLIB/src/postpos.cpp
 	./RTKLIB/src/ppp.c)
-target_link_libraries(psr_doppler_fusion_GNSSLEO_node ${catkin_LIBRARIES} ${CERES_LIBRARIES} 
+target_link_libraries(psr_doppler_fusion_gnssleo_node ${catkin_LIBRARIES} ${CERES_LIBRARIES} 
 						convkml convrnx datum download ephemeris geoid ionex lambda
 						options pntpos postpos ppp_ar ppp preceph qzslex rcvraw rinex
 						rtcm rtcm2 rtcm3 rtcm3e rtkcmn rtkpos rtksvr sbas solution

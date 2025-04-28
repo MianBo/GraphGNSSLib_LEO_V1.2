@@ -8,7 +8,7 @@
  * Author: Weisong Wen (weisong.wen@connect.polyu.hk)
  *******************************************************/
 #define D2R 3.1415926/180.0
-#include <nlosExclusion/GNSS_Raw_Array.h>
+#include <nlosexclusion/GNSS_Raw_Array.h>
 // google implements commandline flags processing.
 #include <gflags/gflags.h>
 // google loging tools
@@ -40,7 +40,7 @@ struct DDCarrierPhaseFactor_DDBias
         double OMGE_ = 7.2921151467E-5;
         double CLIGHT_ = 299792458.0;
 
-        double lambda = dd_measurement.r_master_SV.lamda;
+        double lambda = dd_measurement.r_master_SV.lambda;
         // lambda = 0.192039;
         // LOG(INFO) << "CP lambda-> " << lambda;
 
@@ -133,7 +133,7 @@ struct DDCarrierPhaseConstraint
         double OMGE_ = 7.2921151467E-5;
         double CLIGHT_ = 299792458.0;
 
-        double lambda = dd_measurement.r_master_SV.lamda;
+        double lambda = dd_measurement.r_master_SV.lambda;
         // lambda = 0.192039;
         // LOG(INFO) << "CP lambda-> " << lambda;
 
@@ -234,7 +234,7 @@ struct DDCarrierPhaseConstraint
 	 * @param satellite id, gnss data array (one epoch), gnss data (one satellite)
 	 * @return none
 	 */
-    bool findMasterSatellite(int sat_id, nlosExclusion::GNSS_Raw_Array user_gnss_data, nlosExclusion::GNSS_Raw& master_sv, nlosExclusion::GNSS_Raw& i_sv)
+    bool findMasterSatellite(int sat_id, nlosexclusion::GNSS_Raw_Array user_gnss_data, nlosexclusion::GNSS_Raw& master_sv, nlosexclusion::GNSS_Raw& i_sv)
     {   
         /* get navigation satellite system */
         int sys=satsys(sat_id,NULL);   
@@ -301,9 +301,9 @@ struct DDCarrierPhaseConstraint
 	 * @param time, gnss map from user end, gnss data (one epoch)
 	 * @return none
 	*/
-    void findClosestEpoch(double t, std::map<double, nlosExclusion::GNSS_Raw_Array> gnss_raw_map, nlosExclusion::GNSS_Raw_Array& cloest_epoch_gnss)
+    void findClosestEpoch(double t, std::map<double, nlosexclusion::GNSS_Raw_Array> gnss_raw_map, nlosexclusion::GNSS_Raw_Array& cloest_epoch_gnss)
     {
-        std::map<double, nlosExclusion::GNSS_Raw_Array>::iterator gnss_iter;
+        std::map<double, nlosexclusion::GNSS_Raw_Array>::iterator gnss_iter;
         gnss_iter = gnss_raw_map.begin();
         int length = gnss_raw_map.size();
         double time_diff = 100000;
@@ -326,7 +326,7 @@ struct DDCarrierPhaseConstraint
 	 * @param id, gnss data in one epoch, one satellite
 	 * @return none
 	*/
-    void findSatellitewithSameId(double id, nlosExclusion::GNSS_Raw_Array gnss_data, nlosExclusion::GNSS_Raw& same_id_sv)
+    void findSatellitewithSameId(double id, nlosexclusion::GNSS_Raw_Array gnss_data, nlosexclusion::GNSS_Raw& same_id_sv)
     {
         int length = gnss_data.GNSS_Raws.size();
         for(int i = 0; i < length; i++)
@@ -346,11 +346,11 @@ struct DDCarrierPhaseConstraint
     bool checkCarrierPhaseConsistency(DDMeasurement DD_measurement)
     {
         /* the master satellite is found from user end*/
-        nlosExclusion::GNSS_Raw u_master_SV;
-        nlosExclusion::GNSS_Raw u_iSV;
+        nlosexclusion::GNSS_Raw u_master_SV;
+        nlosexclusion::GNSS_Raw u_iSV;
 
-        nlosExclusion::GNSS_Raw r_master_SV;
-        nlosExclusion::GNSS_Raw r_iSV;
+        nlosexclusion::GNSS_Raw r_master_SV;
+        nlosexclusion::GNSS_Raw r_iSV;
         if(DD_measurement.u_master_SV.carrier_phase<10) return false;
         else if(DD_measurement.u_iSV.carrier_phase<10) return false;
         else if(DD_measurement.r_master_SV.carrier_phase<10) return false;
@@ -368,11 +368,11 @@ struct DDCarrierPhaseConstraint
     bool checkCarrierPhaseConsistencyCycleSlip(DDMeasurement DD_measurement)
     {
         /* the master satellite is found from user end*/
-        nlosExclusion::GNSS_Raw u_master_SV;
-        nlosExclusion::GNSS_Raw u_iSV;
+        nlosexclusion::GNSS_Raw u_master_SV;
+        nlosexclusion::GNSS_Raw u_iSV;
 
-        nlosExclusion::GNSS_Raw r_master_SV;
-        nlosExclusion::GNSS_Raw r_iSV;
+        nlosexclusion::GNSS_Raw r_master_SV;
+        nlosexclusion::GNSS_Raw r_iSV;
         if((DD_measurement.u_master_SV.carrier_phase<10) || (DD_measurement.u_master_SV.visable>0)) return false;
         else if((DD_measurement.u_iSV.carrier_phase<10) || (DD_measurement.u_iSV.visable>0)) return false;
 

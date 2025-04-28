@@ -37,7 +37,7 @@
 /* Reference from NovAtel GNSS/INS */
 #include <novatel_msgs/INSPVAX.h> // novatel_msgs/INSPVAX
 #include "gnss_tools.h"
-#include <nlosExclusion/GNSS_Raw_Array.h>
+#include <nlosexclusion/GNSS_Raw_Array.h>
 
 
 #include <geometry_msgs/Point32.h>

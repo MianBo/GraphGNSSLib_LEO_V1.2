@@ -8,6 +8,7 @@ RUN   if [ "x$(nproc)" = "x1" ] ; then export USE_PROC=1 ; \
       else export USE_PROC=$(($(nproc)/2)) ; fi && \
       apt-get update && apt-get install -y \
       cmake \
+      gedit \
       libatlas-base-dev \
       libeigen3-dev \
       libgoogle-glog-dev \
@@ -26,10 +27,10 @@ RUN   if [ "x$(nproc)" = "x1" ] ; then export USE_PROC=1 ; \
       cmake .. && \
       make -j$(USE_PROC) install && \
       rm -rf ../../ceres-solver && \
-      mkdir -p $CATKIN_WS/src/GraphGNSSLib/
+      mkdir -p $CATKIN_WS/src/GraphGNSSLib_LEO/
 
 # Copy GraphGNSSLib
-COPY ./ $CATKIN_WS/src/GraphGNSSLib/
+COPY ./ $CATKIN_WS/src/GraphGNSSLib_LEO/
 # use the following line if you only have this dockerfile
 # RUN git clone https://github.com/HKUST-Aerial-Robotics/GraphGNSSLib.git
 

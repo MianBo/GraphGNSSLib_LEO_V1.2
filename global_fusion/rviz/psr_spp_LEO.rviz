@@ -130,7 +130,7 @@ Visualization Manager:
         Shaft Length: 2
         Shaft Radius: 3
         Value: Arrow
-      Topic: /WLS_spp_psr
+      Topic: /psr_spp_gnssleo_node/WLS_spp_GNSS_LEO
       Unreliable: false
       Value: true
     - Alpha: 1

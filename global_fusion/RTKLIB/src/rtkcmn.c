@@ -1032,14 +1032,28 @@ extern int solve(const char *tr, const double *A, const double *Y, int n,
 extern int lsq(const double *A, const double *y, int n, int m, double *x,
                double *Q)
 {
-    double *Ay;
+    double *Ay,*P;
     int info;
-    
+    int i,j;
     if (m<n) return -1;
     Ay=mat(n,1);
+    P=mat(n,m);
+    //printf("Ay: %f %f %f %f\n", Ay[0], Ay[1], Ay[2], Ay[3]);
     matmul("NN",n,1,m,1.0,A,y,0.0,Ay); /* Ay=A*y */
     matmul("NT",n,n,m,1.0,A,A,0.0,Q);  /* Q=A*A' */
     if (!(info=matinv(Q,n))) matmul("NN",n,1,n,1.0,Q,Ay,0.0,x); /* x=Q^-1*Ay */
+    // added by Yixin for matrix check
+    if (0)
+    {
+        matmul("NN",n,n,m,1.0,Q,A,0.0,P);
+        printf("The Coeefieient Matrix P= (HH')^(-1)H is :\n");
+        for(i=0; i<n; i++) {
+            for(j=0; j<m; j++) {
+                printf("%.2f,",P[i+j*n]);
+            }
+            printf("\n");
+        }
+    }    
     free(Ay);
     return info;
 }

@@ -16,7 +16,7 @@
  *******************************************************/
 
 #define D2R 3.1415926/180.0
-#include <nlosExclusion/GNSS_Raw_Array.h>
+#include <nlosexclusion/GNSS_Raw_Array.h>
 // google implements commandline flags processing.
 #include <gflags/gflags.h>
 // google loging tools
@@ -46,9 +46,9 @@ GNSS_Tools m_GNSS_Tools; // utilities
 class FactorGraph{
 public:
     /* continuous data stream */
-    std::map<double, nlosExclusion::GNSS_Raw_Array> gnss_raw_map;
+    std::map<double, nlosexclusion::GNSS_Raw_Array> gnss_raw_map;
     std::map<double, nav_msgs::Odometry> doppler_map;
-    std::map<double, nlosExclusion::GNSS_Raw_Array> station_gnss_raw_map;
+    std::map<double, nlosexclusion::GNSS_Raw_Array> station_gnss_raw_map;
 
     /* Ceres solver object */
     // ceres::Problem problem;
@@ -103,7 +103,7 @@ public:
 
 public:
     /* input gnss raw (pseudorange/carrier-phase) data  */
-    bool input_gnss_raw_data(nlosExclusion::GNSS_Raw_Array GNSS_data, double timestamp)
+    bool input_gnss_raw_data(nlosexclusion::GNSS_Raw_Array GNSS_data, double timestamp)
     {
         if(timestamp<0) return false;
         else 
@@ -125,7 +125,7 @@ public:
     }
 
     /* input GNSS data from station  */
-    bool input_station_data(nlosExclusion::GNSS_Raw_Array GNSS_data, double timestamp)
+    bool input_station_data(nlosexclusion::GNSS_Raw_Array GNSS_data, double timestamp)
     {
         if(timestamp<0) return false;
         else 
@@ -210,16 +210,16 @@ public:
         /* allocate the memory for ambiguity state 
          * This is slightly more complicate.
         */
-        std::map<double, nlosExclusion::GNSS_Raw_Array>::iterator iter_sm; // station gnss measurements map iterator
+        std::map<double, nlosexclusion::GNSS_Raw_Array>::iterator iter_sm; // station gnss measurements map iterator
         iter_sm = station_gnss_raw_map.begin();
         for(int k = 0;  k < length; k++,iter_sm++) // tranverse the whole station gnss measurements map
         {
-            nlosExclusion::GNSS_Raw_Array st_gnss_data = (iter_sm->second);
+            nlosexclusion::GNSS_Raw_Array st_gnss_data = (iter_sm->second);
             int sv_cnt = st_gnss_data.GNSS_Raws.size();
             double t = iter_sm->first;
             
             /* find user end gnss data with closest time */
-            nlosExclusion::GNSS_Raw_Array closest_gnss_data;
+            nlosexclusion::GNSS_Raw_Array closest_gnss_data;
             findClosestEpoch(t, gnss_raw_map, closest_gnss_data);
 
             gps_sec_array[k] = int(closest_gnss_data.GNSS_Raws[0].GNSS_time);
@@ -238,7 +238,7 @@ public:
                  *u_iSV: user to ith satellite
                  *r_master_sv: reference to master satellite
                 */
-                nlosExclusion::GNSS_Raw u_master_sv, u_iSV, r_master_sv;
+                nlosexclusion::GNSS_Raw u_master_sv, u_iSV, r_master_sv;
                 
                 /* find the master satellite from the user end */
                 if(findMasterSatellite(sat_id, closest_gnss_data, u_master_sv, u_iSV))
@@ -296,14 +296,14 @@ public:
     /* initialize the previous optimzied states */
     bool initializeOldGraph()
     {
-        std::map<double, nlosExclusion::GNSS_Raw_Array>::iterator iter_pr;
+        std::map<double, nlosexclusion::GNSS_Raw_Array>::iterator iter_pr;
         iter_pr = gnss_raw_map.begin();
         int length = measSize;
 
         /* tranverse the stateArray */
         for(int m = 0;  m < length; m++,iter_pr++) // 
         {
-            nlosExclusion::GNSS_Raw_Array gnss_data = (iter_pr->second);
+            nlosexclusion::GNSS_Raw_Array gnss_data = (iter_pr->second);
             double time = gnss_data.GNSS_Raws[0].GNSS_time;
 
             /* if the state vector is NOT empty, update */
@@ -327,13 +327,13 @@ public:
     bool initializeNewlyAddedGraph()
     {
         int length = measSize;
-        std::map<double, nlosExclusion::GNSS_Raw_Array>::iterator iter;
+        std::map<double, nlosexclusion::GNSS_Raw_Array>::iterator iter;
         iter = gnss_raw_map.begin();
         for(int i = 0; i <length; i++,iter++)
         {
             if(i>=(lastFactorGraphSize-1))
             {
-                nlosExclusion::GNSS_Raw_Array gnss_data = (iter->second);
+                nlosexclusion::GNSS_Raw_Array gnss_data = (iter->second);
                 Eigen::MatrixXd eWLSSolutionECEF = m_GNSS_Tools.WeightedLeastSquare(
                                     m_GNSS_Tools.getAllPositions(gnss_data),
                                     m_GNSS_Tools.getAllMeasurements(gnss_data),
@@ -407,17 +407,17 @@ public:
     /* add double-differenced pseudorange/Carrier-phase FACTORS */
     bool addDDPsrCarFactors(ceres::Problem& problem)
     {
-        std::map<double, nlosExclusion::GNSS_Raw_Array>::iterator iter_sm; // station gnss measurements map iterator
+        std::map<double, nlosexclusion::GNSS_Raw_Array>::iterator iter_sm; // station gnss measurements map iterator
         int length = measSize;
         iter_sm = station_gnss_raw_map.begin();
         for(int k = 0;  k < length; k++,iter_sm++) // tranverse the whole station gnss measurements map
         {
-            nlosExclusion::GNSS_Raw_Array st_gnss_data = (iter_sm->second);
+            nlosexclusion::GNSS_Raw_Array st_gnss_data = (iter_sm->second);
             int sv_cnt = st_gnss_data.GNSS_Raws.size();
             double t = iter_sm->first;
             
             /* find user end gnss data with closest time */
-            nlosExclusion::GNSS_Raw_Array closest_gnss_data;
+            nlosexclusion::GNSS_Raw_Array closest_gnss_data;
             findClosestEpoch(t, gnss_raw_map, closest_gnss_data);
 
             gps_sec_array[k] = int(closest_gnss_data.GNSS_Raws[0].GNSS_time);
@@ -436,7 +436,7 @@ public:
                  *u_iSV: user to ith satellite
                  *r_master_sv: reference to master satellite
                 */
-                nlosExclusion::GNSS_Raw u_master_sv, u_iSV, r_master_sv;
+                nlosexclusion::GNSS_Raw u_master_sv, u_iSV, r_master_sv;
                 
                 /* find the master satellite from the user end */
                 if(findMasterSatellite(sat_id, closest_gnss_data, u_master_sv, u_iSV))
@@ -563,16 +563,16 @@ public:
         weighting_matrix.resize(40, 40);
         weighting_matrix.setIdentity();
 
-        std::map<double, nlosExclusion::GNSS_Raw_Array>::iterator iter_cov; // station gnss measurements map iterator
+        std::map<double, nlosexclusion::GNSS_Raw_Array>::iterator iter_cov; // station gnss measurements map iterator
         iter_cov = station_gnss_raw_map.end();
         iter_cov--;
 
-        nlosExclusion::GNSS_Raw_Array st_gnss_data = (iter_cov->second);
+        nlosexclusion::GNSS_Raw_Array st_gnss_data = (iter_cov->second);
         int sv_cnt = st_gnss_data.GNSS_Raws.size();
         double t = iter_cov->first;
 
         /* find user end gnss data with closest time */
-        nlosExclusion::GNSS_Raw_Array closest_gnss_data;
+        nlosexclusion::GNSS_Raw_Array closest_gnss_data;
         findClosestEpoch(t, gnss_raw_map, closest_gnss_data);
 
         /* get the dd measurements between
@@ -587,7 +587,7 @@ public:
         for(int q = 0; q < sv_cnt; q++)
         {
             double sat_id = st_gnss_data.GNSS_Raws[q].prn_satellites_index;
-            nlosExclusion::GNSS_Raw u_master_sv, u_iSV, r_master_sv;
+            nlosexclusion::GNSS_Raw u_master_sv, u_iSV, r_master_sv;
             
             /* find the master satellite from the user end */
             if(findMasterSatellite(sat_id, closest_gnss_data, u_master_sv, u_iSV))
@@ -856,14 +856,14 @@ public:
         lastFactorGraphSize = measSize;
 
         /* get time from data stream */
-        std::map<double, nlosExclusion::GNSS_Raw_Array>::iterator iter_pr;
+        std::map<double, nlosexclusion::GNSS_Raw_Array>::iterator iter_pr;
         iter_pr = gnss_raw_map.begin();
         int length = measSize;
 
         /* tranverse the stateArray */
         for(int m = 0;  m < length; m++,iter_pr++) // 
         {
-            nlosExclusion::GNSS_Raw_Array gnss_data = (iter_pr->second);
+            nlosexclusion::GNSS_Raw_Array gnss_data = (iter_pr->second);
             double time = gnss_data.GNSS_Raws[0].GNSS_time;
             double prn = gnss_data.GNSS_Raws[0].prn_satellites_index;
 
@@ -963,7 +963,7 @@ public:
             pose_stamped.header.frame_id = "map";
             pose_stamped.pose.position.x = FGOENU(0);
             pose_stamped.pose.position.y = FGOENU(1);
-            pose_stamped.pose.position.z = 10;
+            pose_stamped.pose.position.z = FGOENU(2);
             fgo_path.poses.push_back(pose_stamped);
             // std::cout << "pose_stamped- FGO-> "<< std::endl<< pose_stamped;
         }

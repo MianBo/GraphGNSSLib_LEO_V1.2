@@ -42,7 +42,7 @@
 /* Reference from NovAtel GNSS/INS */
 #include <novatel_msgs/INSPVAX.h> // novatel_msgs/INSPVAX
 #include "gnss_tools.h"
-#include <nlosExclusion/GNSS_Raw_Array.h>
+#include <nlosexclusion/GNSS_Raw_Array.h>
 
 #include <geometry_msgs/Point32.h>
 #include <stdio.h>
@@ -76,18 +76,18 @@
 class psr_doppler_fusion
 {
     ros::NodeHandle nh;
-
+    std::string frame_id = "map";
     /* ros subscriber */
     ros::Publisher pub_WLSENU, pub_FGOENU, pub_global_path, pub_fgo_llh;
-    std::map<double, nlosExclusion::GNSS_Raw_Array> gnss_raw_map;
+    std::map<double, nlosexclusion::GNSS_Raw_Array> gnss_raw_map;
     std::map<double, nav_msgs::Odometry> doppler_map;
 
     GNSS_Tools m_GNSS_Tools; // utilities
 
     /* subscriber */
-    std::unique_ptr<message_filters::Subscriber<nlosExclusion::GNSS_Raw_Array>> gnss_raw_array_sub;
+    std::unique_ptr<message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>> gnss_raw_array_sub;
     std::unique_ptr<message_filters::Subscriber<nav_msgs::Odometry>> doppler_sub;
-    std::unique_ptr<message_filters::TimeSynchronizer<nlosExclusion::GNSS_Raw_Array, nav_msgs::Odometry>> syncdoppler2GNSSRaw;
+    std::unique_ptr<message_filters::TimeSynchronizer<nlosexclusion::GNSS_Raw_Array, nav_msgs::Odometry>> syncdoppler2GNSSRaw;
 
     /* thread lock for data safe */
     std::mutex m_gnss_raw_mux;
@@ -107,7 +107,7 @@ class psr_doppler_fusion
     nav_msgs::Path fgo_path;
 
     /* log path */
-    std::string logPath;
+    std::string gnss_fgo_path;
 
 private:
     // std::unique_ptr<factor_graph> factor_graph_ptr_; // factor graph ptr
@@ -129,13 +129,14 @@ private:
 public:
     psr_doppler_fusion()
     {
-        /* setup logpath */
-        ros::param::get("logPath", logPath);
-        if (!ros::param::get("logPath", logPath))
+        /* setup gnss_fgo_path */
+        
+        if (!ros::param::get("~gnss_fgo_path", gnss_fgo_path))
         {
-            logPath = "/home/gao-yixin/GraphGNSSLib_LEO/src/global_fusion/dataset/2021_0521_0607/GNSS_only_FGO_trajectoryllh_psr_dop_fusion.csv";
+            std::cerr << "ROS parameter 'gnss_fgo_path' of psr_doppler_fusion is not set!" << std::endl;
+            gnss_fgo_path = "./GNSS_only_FGO_trajectoryllh_psr_dop_fusion.csv";
         }
-        std::cout << "logPath-> "<< logPath<< std::endl;
+        std::cout << "gnss_fgo_path-> "<< gnss_fgo_path<< std::endl;
         /* thread for factor graph optimization */
         optimizationThread = std::thread(&psr_doppler_fusion::solveOptimization, this);
         
@@ -143,11 +144,14 @@ public:
         pub_FGOENU = nh.advertise<nav_msgs::Odometry>("FGO", 100); //  
         pub_fgo_llh = nh.advertise<sensor_msgs::NavSatFix>("fgo_llh", 100);
 
-        gnss_raw_array_sub.reset(new message_filters::Subscriber<nlosExclusion::GNSS_Raw_Array>(nh, "/gnss_preprocessor_node/GNSSPsrCarRov1", 10000));// GNSS only
+        gnss_raw_array_sub.reset(new message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>(nh, "/gnss_preprocessor_node/GNSSPsrCarRov1", 10000));// GNSS only
         doppler_sub.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh, "/gnss_preprocessor_node/GNSSDopVelRov1", 10000));// GNSS only
-        //gnss_raw_array_sub.reset(new message_filters::Subscriber<nlosExclusion::GNSS_Raw_Array>(nh, "/gnssLEOmsg_combination_node/GNSS_LEO_PsrCarRov", 10000));// GNSS+LEO
-        //doppler_sub.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh, "/psr_spp_LEO_node/GNSS_LEO_DopVelRov", 10000));// GNSS+LEO
-        syncdoppler2GNSSRaw.reset(new message_filters::TimeSynchronizer<nlosExclusion::GNSS_Raw_Array, nav_msgs::Odometry>(*gnss_raw_array_sub, *doppler_sub, 10000));
+
+        //gnss_raw_array_sub.reset(new message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>(nh, "/leo_raw_publisher_node/LEOPsrCarRov1", 10000));// LEO only
+        //doppler_sub.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh, "/psr_spp_gnssleo_node/LEODopVelRov", 10000));// LEO only
+        //gnss_raw_array_sub.reset(new message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>(nh, "/gnss_leo_msg_combination_node/GNSS_LEO_PsrCarRov", 10000));// GNSS+LEO
+        //doppler_sub.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh, "/psr_spp_gnssleo_node/GNSS_LEO_DopVelRov", 10000));// GNSS+LEO
+        syncdoppler2GNSSRaw.reset(new message_filters::TimeSynchronizer<nlosexclusion::GNSS_Raw_Array, nav_msgs::Odometry>(*gnss_raw_array_sub, *doppler_sub, 10000));
 
         syncdoppler2GNSSRaw->registerCallback(boost::bind(&psr_doppler_fusion::gnssraw_doppler_msg_callback,this, _1, _2));
 
@@ -243,7 +247,7 @@ public:
                 factor_graph.removeStatesOutsideSlidingWindow();
 
                 /* log result */
-                factor_graph.logResults(logPath);
+                factor_graph.logResults(gnss_fgo_path);
 
                 /* free memory (done when finish all the data) */
                 // factor_graph.freeStateMemory();
@@ -265,7 +269,7 @@ public:
    * @return void
    @ 
    */
-    void gnssraw_doppler_msg_callback(const nlosExclusion::GNSS_Raw_ArrayConstPtr& gnss_msg, const nav_msgs::OdometryConstPtr& doppler_msg)
+    void gnssraw_doppler_msg_callback(const nlosexclusion::GNSS_Raw_ArrayConstPtr& gnss_msg, const nav_msgs::OdometryConstPtr& doppler_msg)
     {
         m_gnss_raw_mux.lock();
         hasNewData = true;
@@ -292,8 +296,8 @@ public:
                 LOG(INFO) << "doppler_map.size() -> "<< std::endl << doppler_map.size();
 
                 nav_msgs::Odometry odometry;
-                odometry.header.frame_id = "map";
-                odometry.child_frame_id = "map";
+                odometry.header.frame_id = frame_id;//"map";
+                odometry.child_frame_id = frame_id;//"map";
                 odometry.pose.pose.position.x = WLSENU(0);
                 odometry.pose.pose.position.y = WLSENU(1);
                 odometry.pose.pose.position.z = WLSENU(2);

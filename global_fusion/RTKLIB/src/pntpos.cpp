@@ -44,12 +44,12 @@
 #include <novatel_msgs/BESTPOS.h> // novatel_msgs/INSPVAX
 
 #include "../../include/gnss_tools.h"
-#include <nlosExclusion/GNSS_Raw_Array.h>
-#include <nlosExclusion/GNSS_Raw.h>
+#include <nlosexclusion/GNSS_Raw_Array.h>
+#include <nlosexclusion/GNSS_Raw.h>
 
 //add by Yixin
-#include <nlosExclusion/LEO_dopp.h>
-#include <nlosExclusion/LEO_dopp_Array.h>
+#include <nlosexclusion/LEO_dopp.h>
+#include <nlosexclusion/LEO_dopp_Array.h>
 #include <std_msgs/Header.h> 
 #include <vector> 
 #include <iostream>
@@ -59,7 +59,6 @@
 #include <stdlib.h>
 #include <iomanip>
 
-FILE* gnss_only_wls = fopen("/home/gao-yixin/GraphGNSSLib_LEO/src/global_fusion/dataset/2021_0521_0607/GNSS_only_WLS_result.csv", "w+");
 
 
 static const char rcsid[]="$Id:$";
@@ -77,7 +76,7 @@ static const char rcsid[]="$Id:$";
 #define ERR_BRDCI   0.5         /* broadcast iono model error factor */
 #define ERR_CBIAS   0.3         /* code bias error std (m) */
 #define REL_HUMI    0.7         /* relative humidity for saastamoinen model */
-
+std::string WLS_folder;
 ros::Publisher pub_pntpos_odometry;
 ros::Publisher pub_wls_odometry;
 
@@ -105,13 +104,28 @@ ros::Time GPSTimeToROSTime(double gps_time) {
     return ros_time;
 }
 
+extern void initializeWLSFolder(void) {
+    std::string WLS_folder;
+    if (!ros::param::get("~WLS_folder", WLS_folder)) {
+        std::cerr << "ROS parameter 'WLS_folder' is not set!" << std::endl;
+        return;
+    }
+
+    FILE* gnss_only_wls = fopen(WLS_folder.c_str(), "w+");
+    if (gnss_only_wls == NULL) {
+        perror("Error opening file");
+        return;
+    }
+    fclose(gnss_only_wls);
+}
+
 extern void pntposRegisterPub(ros::NodeHandle &n)
 {
     pub_pntpos_odometry = n.advertise<nav_msgs::Odometry>("WLSENURTKLIB", 1000);
-    pub_gnss_raw = n.advertise<nlosExclusion::GNSS_Raw_Array>("GNSSPsrCarRov1", 1000);
+    pub_gnss_raw = n.advertise<nlosexclusion::GNSS_Raw_Array>("GNSSPsrCarRov1", 1000);
     pub_wls_odometry = n.advertise<nav_msgs::Odometry>("WLSENUGoGPS", 1000);
     pub_velocity_from_doppler = n.advertise<nav_msgs::Odometry>("GNSSDopVelRov1", 1000); // velocity_from_doppler
-    pub_doppler = n.advertise<nlosExclusion::LEO_dopp_Array>("GNSS_Dopp_Array", 1000); // velocity_from_doppler
+    pub_doppler = n.advertise<nlosexclusion::LEO_dopp_Array>("GNSS_Dopp_Array", 1000); // velocity_from_doppler
 }
 
 
@@ -593,7 +607,7 @@ static int resdop(const obsd_t *obs, int n, const double *rs, const double *dts,
         
         /* doppler residual */
         v[nv]=-lam*obs[i].D[0]-(rate+x[3]-CLIGHT*dts[1+i*2]);
-        
+        // std::cout<< " doppler residue ("<< nv <<"):" << v[nv] << std::endl;
         /* design matrix */
         for (j=0;j<4;j++) H[j+nv*4]=j<3?-e[j]:1.0;
         
@@ -652,6 +666,7 @@ extern int pntpos(const obsd_t *obs, int n, const nav_t *nav,
                   const prcopt_t *opt, sol_t *sol, double *azel, ssat_t *ssat,
                   char *msg)
 {
+    std::string frame_id = "map";
     prcopt_t opt_=*opt;
     double *rs,*dts,*var,*azel_,*resp;
     int i,stat,vsat[MAXOBS]={0},svh[MAXOBS];
@@ -674,31 +689,32 @@ extern int pntpos(const obsd_t *obs, int n, const nav_t *nav,
         opt_.tropopt=TROPOPT_SAAS;
     }
 
-    /* construct data for WLS with nlosExclusion::GNSS_Raw_Array*/
-    nlosExclusion::GNSS_Raw_Array gnss_data;
+    /* construct data for WLS with nlosexclusion::GNSS_Raw_Array*/
+    nlosexclusion::GNSS_Raw_Array gnss_data;
     int current_week = 0;
     double current_tow = time2gpst(obs[0].time, &current_week);
     double epoch_time[100];
     time2epoch(obs[0].time, epoch_time);
 
-    nlosExclusion::LEO_dopp_Array GNSS_dopp_array;
-    nlosExclusion::LEO_dopp gnss_dopp_element;
+    nlosexclusion::LEO_dopp_Array GNSS_dopp_array;
+    nlosexclusion::LEO_dopp gnss_dopp_element;
     
 
     /* satellite positons, velocities and clocks */
     satposs(sol->time,obs,n,nav,opt_.sateph,rs,dts,var,svh);
 
 
-
+    
     /* estimate receiver position with pseudorange by RTKLIB */
     stat=estpos(obs,n,rs,dts,var,svh,nav,&opt_,sol,azel_,vsat,resp,msg);
-
+    
     /* estimate receiver position with pseudorange by WLS and Eigen */
     bool haveOneBeiDou = false;
     int CMP_cnt = 0, GPS_cnt = 0;
     for(int s_i=0;s_i<n; s_i++)
     {
-        nlosExclusion::GNSS_Raw gnss_raw;
+        nlosexclusion::GNSS_Raw gnss_raw;
+        gnss_raw.GNSS_week = current_week;
         gnss_raw.GNSS_time = current_tow;
         gnss_raw.total_sv = float(n);
         gnss_raw.prn_satellites_index = float(obs[s_i].sat);
@@ -709,7 +725,7 @@ extern int pntpos(const obsd_t *obs, int n, const nav_t *nav,
         for (int j=0,snr=0.0;j<NFREQ;j++) if ((snr=obs[s_i].SNR[j])!=0.0) break;
         gnss_raw.snr = obs[s_i].SNR[0] * 0.25;
         // gnss_raw.snr = snr;
-
+        gnss_raw.doppler = obs[s_i].D[0];
         gnss_raw.azimuth = azel_[0 + s_i*2] * R2D;
         gnss_raw.elevation = azel_[1 + s_i * 2] * R2D;
         
@@ -745,6 +761,11 @@ extern int pntpos(const obsd_t *obs, int n, const nav_t *nav,
         gnss_raw.sat_pos_x = rs[0 + s_i * 6];
         gnss_raw.sat_pos_y = rs[1 + s_i * 6];
         gnss_raw.sat_pos_z = rs[2 + s_i * 6];
+        gnss_raw.vel_x = rs[3 + s_i * 6];
+        gnss_raw.vel_y = rs[4 + s_i * 6];
+        gnss_raw.vel_z = rs[5 + s_i * 6];
+        gnss_raw.dt = dts[0 + s_i * 2];
+        gnss_raw.ddt = dts[1 + s_i * 2];
 
         /* get pr*/
         double pr = 0;
@@ -756,7 +777,7 @@ extern int pntpos(const obsd_t *obs, int n, const nav_t *nav,
         gnss_raw.pseudorange = P + gnss_raw.sat_clk_err - dion - dtrp;
         gnss_raw.raw_pseudorange = obs[s_i].P[0];
         gnss_raw.carrier_phase = obs[s_i].L[0];
-        gnss_raw.lamda = nav->lam[obs[s_i].sat-1][0];
+        gnss_raw.lambda = nav->lam[obs[s_i].sat-1][0];
         // LOG(INFO) << "nav->lam[obs[s_i].sat-1][0];  "<<nav->lam[obs[s_i].sat-1][0];
         // LOG(INFO) << "nav->lam[obs[s_i].sat][0];  "<<nav->lam[obs[s_i].sat][0];
         int sys=satsys(obs[s_i].sat,NULL);   
@@ -841,11 +862,13 @@ extern int pntpos(const obsd_t *obs, int n, const nav_t *nav,
         // std::cout << "eWLSSolutionECEF (wls)-> "<< eWLSSolutionECEF << std::endl;
         // std::cout << "ENU (wls)-> "<< ENU << "    epoch-> "<< current_tow<< std::endl;
         nav_msgs::Odometry odometry;
-        odometry.header.frame_id = "map";
-        odometry.child_frame_id = "map";
+        odometry.header.frame_id =  frame_id;//"map";
+        odometry.child_frame_id = frame_id;//"map";
+        odometry.header.stamp = GPSTimeToROSTime((current_week*604800+current_tow));
         odometry.pose.pose.position.x = ENU(0);
         odometry.pose.pose.position.y = ENU(1);
-        odometry.pose.pose.position.z = 1;
+        odometry.pose.pose.position.z = ENU(2);
+        std::cout<<"ENU(0) "<<ENU(0)<<" ENU(1) "<<ENU(1)<<" ENU(2) "<<ENU(2)<<std::endl;
         pub_wls_odometry.publish(odometry);
     }
     #endif
@@ -871,7 +894,7 @@ extern int pntpos(const obsd_t *obs, int n, const nav_t *nav,
         estvel(obs,n,rs,dts,nav,&opt_,sol,azel_,vsat, dop_res);
     }
     // if (1) estvel(obs,n,rs,dts,nav,&opt_,sol,azel_,vsat, dop_res);
-    // std::cout << "norm(dx,n)-> "<<norm(dop_res,n)<<std::endl;
+    std::cout << "norm(dx,n)-> "<<norm(dop_res,n)<<std::endl;
     
     nav_msgs::Odometry odometry;
     odometry.header.frame_id = "map";
@@ -922,7 +945,7 @@ extern int pntpos(const obsd_t *obs, int n, const nav_t *nav,
         odometry.child_frame_id = "map";
         odometry.pose.pose.position.x = ENU(0);
         odometry.pose.pose.position.y = ENU(1);
-        odometry.pose.pose.position.z = 1;
+        odometry.pose.pose.position.z = ENU(2);
         for(int i = 0; i < 6; i++)
         {
             // odometry.pose.covariance[i] = sol->qr[i];
@@ -931,15 +954,25 @@ extern int pntpos(const obsd_t *obs, int n, const nav_t *nav,
         odometry.twist.twist.linear.x = sol->rr[3];
         odometry.twist.twist.linear.y = sol->rr[4];
         odometry.twist.twist.linear.z = sol->rr[5];
+        odometry.header.stamp = GPSTimeToROSTime((current_week*604800+current_tow));
         pub_pntpos_odometry.publish(odometry);
-        FILE* gnss_only_wls = fopen("/home/gao-yixin/GraphGNSSLib_LEO/src/global_fusion/dataset/2021_0521_0607/GNSS_only_WLS_result.csv", "a+");
+        
+        std::string WLS_folder;
+        ros::param::get("~WLS_folder", WLS_folder);
+        FILE* gnss_only_wls = fopen(WLS_folder.c_str(), "a+");
+        if (gnss_only_wls == NULL) {
+            perror("Error opening WLS file");
+            std::cout << "Cannot open WLS file: " << WLS_folder << std::endl;
+            return 0;
+        }
         double pos[3];
         
         double rr[3]={sol->rr[0], sol->rr[1], sol->rr[2]};
         ECEF<<sol->rr[0], sol->rr[1], sol->rr[2];
         ENU=m_GNSS_Tools.ecef2enu(ENU_ref, ECEF);
+        // std::cout << "ENU (RTKLIB)-> "<< ENU << std::endl;
         ecef2pos(sol->rr,pos);
-        fprintf(gnss_only_wls, "%d,%d,%.9f,%.9f,%.9f,", 2158, int(current_tow),pos[0]*R2D,pos[1]*R2D,pos[2]);
+        fprintf(gnss_only_wls, "%d,%d,%.9f,%.9f,%.9f,", int(current_week), int(current_tow),pos[0]*R2D,pos[1]*R2D,pos[2]);
         fprintf(gnss_only_wls, "%.9f,%.9f,%.9f \n", ENU[0], ENU[1],ENU[2]);
         fflush(gnss_only_wls);
 

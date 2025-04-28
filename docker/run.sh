@@ -32,14 +32,14 @@ sleep 1
 # rviz -d ../config/vins_rviz_config.rviz &
 # RVIZ_PID=$!
 
-GraphGNSSLib_DIR=$(abspath "..")
+GraphGNSSLib_LEO_DIR=$(abspath "..")
 
 docker run \
   -it \
   --rm \
   --net=host \
-  -v ${GraphGNSSLib_DIR}:/root/catkin_ws/src/GraphGNSSLib/ \
-  ros:GraphGNSSLib \
+  -v ${GraphGNSSLib_LEO_DIR}:/root/catkin_ws/src/GraphGNSSLib_LEO/ \
+  ros:GraphGNSSLib_LEO \
   /bin/bash -c \
   "cd /root/catkin_ws/; \
   catkin config \

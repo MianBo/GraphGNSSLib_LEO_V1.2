@@ -9,7 +9,7 @@
  *******************************************************/
 
 #define D2R 3.1415926/180.0
-#include <nlosExclusion/GNSS_Raw_Array.h>
+#include <nlosexclusion/GNSS_Raw_Array.h>
 // google implements commandline flags processing.
 #include <gflags/gflags.h>
 // google loging tools

@@ -7,13 +7,10 @@
  *
  * Author: Weisong Wen (weisong.wen@connect.polyu.hk)
  * 
- * Main fucntions: pseudorange/Doppler/Carrier-phase fusion using factor graph optimization 
- * input: pseudorange (psr_), Doppler velocity (doppler_) and carrier-phase (car_) from GPS/BeiDou.
- * output: position of the GNSS receiver, ambiguity of carrier-phase 
- * SPECIFICALLY, this code is an example usage of the DynamicAutoDiffCostFunction, the size of the parameters can be a variable when we use the DynamicAutoDiffCostFunction. 
- * CURRENTLY, the Qaa for LAMBDA algorithm is derived by the covariance estimation of Ceres-solver.
- * Date: 2020/12/06
- * Currently, the covariance estimation step is time consuming
+ * Main fucntions: pseudorange/Doppler velocity fusion using factor graph optimization 
+ * input: pseudorange, Doppler velocity from GPS/BeiDou.
+ * output: position of the GNSS receiver 
+ * Date: 2020/11/27
  *******************************************************/
 
 // std inputs and outputs, fstream
@@ -73,26 +70,24 @@
 #include <stdarg.h>
 #include "../../RTKLIB/src/rtklib.h"
 
- /* factor graph related head file */
-#include "../../include/gnss_estimator/psr_doppler_car_rtk_dyna.h"
+// /* factor graph related head file */
+#include "../../include/gnss_estimator/psr_doppler_fusion.h"
 
-class psr_doppler_car_rtk
+class psr_doppler_fusion
 {
     ros::NodeHandle nh;
 
     /* ros subscriber */
-    ros::Publisher pub_WLSENU, pub_FGOENU, pub_global_path, pub_fgo_llh;
+    ros::Publisher pub_WLSENU, pub_FGOENU, pub_global_path, pub_fgo_llh,pub_FGOECEF;
     std::map<double, nlosexclusion::GNSS_Raw_Array> gnss_raw_map;
     std::map<double, nav_msgs::Odometry> doppler_map;
-    std::map<double, nlosexclusion::GNSS_Raw_Array> station_gnss_raw_map;
 
-    GNSS_Tools m_GNSS_Tools; // utilities  
+    GNSS_Tools m_GNSS_Tools; // utilities
 
     /* subscriber */
     std::unique_ptr<message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>> gnss_raw_array_sub;
     std::unique_ptr<message_filters::Subscriber<nav_msgs::Odometry>> doppler_sub;
-    std::unique_ptr<message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>> station_gnss_raw_array_sub;
-    std::unique_ptr<message_filters::TimeSynchronizer<nlosexclusion::GNSS_Raw_Array, nlosexclusion::GNSS_Raw_Array, nav_msgs::Odometry>> syncdoppler2GNSSRaw;
+    std::unique_ptr<message_filters::TimeSynchronizer<nlosexclusion::GNSS_Raw_Array, nav_msgs::Odometry>> syncdoppler2GNSSRaw;
 
     /* thread lock for data safe */
     std::mutex m_gnss_raw_mux;
@@ -102,18 +97,26 @@ class psr_doppler_car_rtk
 
     int gnss_frame = 0;
     Eigen::Matrix<double, 3,1> ENU_ref;
-    int slidingWindowSize = 10000; // ? epoch measurements 150 100000
+    int slidingWindowSize = 10000000; // ? epoch measurements 150 100000
     bool hasNewData = false;
 
     /* latest state in ENU */
     Eigen::Matrix<double ,3,1> FGOENULatest;
+    /* latest state in ECEF */
+    Eigen::Matrix<double ,3,1> FGOECEFLatest;
+
 
     /* path in ENU */
     nav_msgs::Path fgo_path;
 
+    /* log path */
+    std::string gnssleo_fgo_path;
+
+
 private:
     // std::unique_ptr<factor_graph> factor_graph_ptr_; // factor graph ptr
     FactorGraph factor_graph;
+
     
     bool initializeFactorGraph(ceres::Solver::Options& options) 
     {
@@ -123,32 +126,39 @@ private:
         /* set up ceres-solver options */
         factor_graph.setupSolverOptions(options);
 
-        /* set up loss functions (Huber, Cauchy)*/
+        /* set up loss functions (Huber, Cauchy, NULL)*/
         factor_graph.setupLossFunction("Huber");
     }
 
 
 public:
-    psr_doppler_car_rtk()
-    {      
+    psr_doppler_fusion()
+    {
+        /* setup gnssleo_fgo_path */
+        ros::param::get("~gnssleo_fgo_path", gnssleo_fgo_path);
+        if (!ros::param::get("~gnssleo_fgo_path", gnssleo_fgo_path))
+        {
+            LOG(ERROR) << "gnssleo_fgo_path not set, using default path";
+            gnssleo_fgo_path = "./GNSSLEO_FGO_trajectoryllh_psr_dop_fusion.csv"; // change to your path
+        }
+        std::cout << "gnssleo_fgo_path-> "<< gnssleo_fgo_path<< std::endl;
         /* thread for factor graph optimization */
-        optimizationThread = std::thread(&psr_doppler_car_rtk::solveOptimization, this);
+        optimizationThread = std::thread(&psr_doppler_fusion::solveOptimization, this);
         
-        /* publisher */
-        pub_WLSENU = nh.advertise<nav_msgs::Odometry>("WLSGoGPS", 100); // 
-        pub_FGOENU = nh.advertise<nav_msgs::Odometry>("FGO", 100); //  
-        pub_fgo_llh = nh.advertise<sensor_msgs::NavSatFix>("fgo_llh", 100);
+        pub_WLSENU = nh.advertise<nav_msgs::Odometry>("WLSGoGPS_GNSSLEO", 100); // 
+        pub_FGOENU = nh.advertise<nav_msgs::Odometry>("FGO_GNSSLEO", 100); //  
+        pub_FGOECEF = nh.advertise<nav_msgs::Odometry>("PsrDopp_FGO_GNSSLEO_ECEF", 100); // 
+        pub_fgo_llh = nh.advertise<sensor_msgs::NavSatFix>("fgo_llh_GNSSLEO", 100);
 
-        /* subscriber of three topics  */
-        gnss_raw_array_sub.reset(new message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>(nh, "/gnss_preprocessor_node/GNSSPsrCarRov1", 10000));
-        doppler_sub.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh, "/gnss_preprocessor_node/GNSSDopVelRov1", 10000));
-        /* GNSS measurements from station (reference end) */
-        station_gnss_raw_array_sub.reset(new message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>(nh, "/gnss_preprocessor_node/GNSSPsrCarStation1", 256)); // measurements from station
-        syncdoppler2GNSSRaw.reset(new message_filters::TimeSynchronizer<nlosexclusion::GNSS_Raw_Array, nlosexclusion::GNSS_Raw_Array, nav_msgs::Odometry>(*gnss_raw_array_sub, *station_gnss_raw_array_sub, *doppler_sub, 32));
-        syncdoppler2GNSSRaw->registerCallback(boost::bind(&psr_doppler_car_rtk::gnssraw_doppler_msg_callback,this, _1, _2, _3));
+        //gnss_raw_array_sub.reset(new message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>(nh, "/gnss_preprocessor_node/GNSSPsrCarRov1", 10000));// GNSS only
+        //doppler_sub.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh, "/gnss_preprocessor_node/GNSSDopVelRov1", 10000));// GNSS only
+        gnss_raw_array_sub.reset(new message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>(nh, "/gnss_leo_msg_combination_node/GNSS_LEO_PsrCarRov", 10000));// GNSS+LEO
+        doppler_sub.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh, "/psr_spp_gnssleo_node/GNSS_LEO_DopVelRov", 10000));// GNSS+LEO
+        syncdoppler2GNSSRaw.reset(new message_filters::TimeSynchronizer<nlosexclusion::GNSS_Raw_Array, nav_msgs::Odometry>(*gnss_raw_array_sub, *doppler_sub, 10000));
 
-        /* publish the path from factor graph optimization */
-        pub_global_path = nh.advertise<nav_msgs::Path>("/FGOGlobalPath", 100); // 
+        syncdoppler2GNSSRaw->registerCallback(boost::bind(&psr_doppler_fusion::gnssraw_doppler_msg_callback,this, _1, _2));
+
+        pub_global_path = nh.advertise<nav_msgs::Path>("/GNSS_LEO_FGOGlobalPath", 100); // 
         
         /* reference point for ENU calculation */
         ENU_ref<< ref_lon, ref_lat, ref_alt;
@@ -165,6 +175,8 @@ public:
     {
         /* clear data stream */
         factor_graph.clearDataStream();
+
+        
         
         while(1)
         {
@@ -183,14 +195,19 @@ public:
                 /* initialize factor graph */
                 initializeFactorGraph(options);
 
+                /* clear variables */
+                factor_graph.clearVariables();
+
                 /* get data stream size */
                 factor_graph.getDataStreamSize();
 
-                /* setup memory for position state and ambiguity state */
-                factor_graph.setStateMemoryAndInitialize();
+                /* setup memory for state */
+                factor_graph.setupStateMemory();
 
                 /* initialize factor graph parameters */
                 factor_graph.initializeFactorGraphParas();
+
+                
 
                 /* initialize the previous optimzied states */
                 factor_graph.initializeOldGraph();
@@ -198,43 +215,44 @@ public:
                 /* initialize the newly added states */
                 factor_graph.initializeNewlyAddedGraph();
 
+                /* add parameter blocks */
+                factor_graph.addParameterBlocksToGraph(problem);
+
                 /* fix the first parameter block */
                 factor_graph.fixFirstState(false, problem);
 
                 /* add Doppler FACTORS to factor graph */
                 factor_graph.addDopplerFactors(problem);
 
-                /* add double-differenced pseudorange/Carrier-phase FACTORS */
-                factor_graph.addDDPsrCarFactors(problem);
+                /* add pseudorange FACTORS to factor graph */
+                factor_graph.addPseudorangeFactors(problem);
 
-                /* solve the factor graph (float solution) */
-                factor_graph.solveFactorGraphFloatSolution(problem, options, summary);
-
-                std::cout << "float solution OptTime-> "<< OptTime.toc()<< std::endl;
+                /* solve the factor graph */
+                factor_graph.solveFactorGraph(problem, options, summary);
 
                 /* save graph state to variables */
                 factor_graph.saveGraphStateToVector();
 
-                /* get covariance matrix of latest epoch via Ceres-solver*/
-                factor_graph.getCovarianceMatrixOfLatestEpoch(problem);
-
-                /* solve the ambiguity resolution of current epoch */
-                // factor_graph.solveAmbiguityResolutionViaCovPropogation();
-
-                /* solve the ambiguity resolution of current epoch */
-                factor_graph.solveAmbiguityResolutionViaCovCeresSolver();
-
                 /* set reference point for ENU calculation */
                 factor_graph.setupReferencePoint();
 
-                /* get the path in factor graph */
+                /* get the latest state in ENU*/
                 FGOENULatest = factor_graph.getLatestStateENU();
 
-                /* print the lastest float state in factor graph */
-                factor_graph.printLatestFloatStateENU();
+                /* get the latest state in ENU*/
+                FGOECEFLatest = factor_graph.getLatestStateECEF();
+                /* publish the latest state in ECEF */
+                nav_msgs::Odometry odometry_ecef;
+                odometry_ecef.header.frame_id = "glio_leo";
+                odometry_ecef.child_frame_id = "glio_leo";
+                odometry_ecef.pose.pose.position.x = FGOECEFLatest(0);
+                odometry_ecef.pose.pose.position.y = FGOECEFLatest(1);
+                odometry_ecef.pose.pose.position.z = FGOECEFLatest(2);
+                std::cout<< "FGOECEFLatest-> "<< std::endl<< FGOECEFLatest<< std::endl;
+                pub_FGOECEF.publish(odometry_ecef);
 
-                /* print the lastest fixed state in factor graph */
-                factor_graph.printLatestFixedStateENU();
+                /* publish the lastest state in factor graph */
+                factor_graph.printLatestStateENU();
 
                 /* publish the path from FGO */
                 fgo_path = factor_graph.getPathENU(fgo_path);
@@ -243,10 +261,16 @@ public:
                 /* remove the data outside sliding window */
                 factor_graph.removeStatesOutsideSlidingWindow();
 
+                /* log result */
+                factor_graph.logResults(gnssleo_fgo_path);
+
+                /* free memory (done when finish all the data) */
+                // factor_graph.freeStateMemory();
+
                 hasNewData = false;
 
                 /** */
-                std::cout << "final OptTime-> "<< OptTime.toc()<< std::endl;
+                std::cout << "OptTime-> "<< OptTime.toc()<< std::endl;
             }
             m_gnss_raw_mux.unlock();
             std::chrono::milliseconds dura(10); // this thread sleep for 10 ms
@@ -260,19 +284,12 @@ public:
    * @return void
    @ 
    */
-   void gnssraw_doppler_msg_callback(const nlosexclusion::GNSS_Raw_ArrayConstPtr& gnss_msg, const nlosexclusion::GNSS_Raw_ArrayConstPtr& station_gnss_msg, const nav_msgs::OdometryConstPtr& doppler_msg)
+    void gnssraw_doppler_msg_callback(const nlosexclusion::GNSS_Raw_ArrayConstPtr& gnss_msg, const nav_msgs::OdometryConstPtr& doppler_msg)
     {
         m_gnss_raw_mux.lock();
         hasNewData = true;
         gnss_frame++;
-        double time0 = gnss_msg->GNSS_Raws[0].GNSS_time;
-        double time1 = station_gnss_msg->GNSS_Raws[0].GNSS_time;
         double time_frame = doppler_msg->pose.pose.position.x;
-
-        // std::cout<<"gnss time0 " <<time0 <<std::endl; 
-        // std::cout<<"doppler time_frame " <<time_frame <<std::endl;
-        // std::cout<<"station time1 " <<time1 <<std::endl;
-
         /* save the  */
         if(checkValidEpoch(time_frame) && m_GNSS_Tools.checkRepeating(*gnss_msg))
         {
@@ -280,10 +297,8 @@ public:
             {
                 doppler_map[time_frame] = *doppler_msg;
                 gnss_raw_map[time_frame] = *gnss_msg;
-                station_gnss_raw_map[time_frame] = *station_gnss_msg;
 
                 factor_graph.input_gnss_raw_data(*gnss_msg, time_frame);
-                factor_graph.input_station_data(*station_gnss_msg, time_frame);
                 factor_graph.input_doppler_data(*doppler_msg, time_frame);
 
                 Eigen::MatrixXd eWLSSolutionECEF = m_GNSS_Tools.WeightedLeastSquare(
@@ -293,6 +308,7 @@ public:
                 Eigen::Matrix<double ,3,1> WLSENU;
                 WLSENU = m_GNSS_Tools.ecef2enu(ENU_ref, eWLSSolutionECEF);
                 LOG(INFO) << "WLSENU -> "<< std::endl << WLSENU;
+                LOG(INFO) << "doppler_map.size() -> "<< std::endl << doppler_map.size();
 
                 nav_msgs::Odometry odometry;
                 odometry.header.frame_id = "map";
@@ -308,7 +324,8 @@ public:
         m_gnss_raw_mux.unlock();
     }
 
-    ~psr_doppler_car_rtk()
+
+    ~psr_doppler_fusion()
     {
     }
    
@@ -319,10 +336,10 @@ int main(int argc, char **argv)
     FLAGS_logtostderr = 1;  // output to console
     google::InitGoogleLogging(argv[0]); // init the google logging
     google::ParseCommandLineFlags(&argc, &argv, true); // parseCommandLineFlags 
-    ros::init(argc, argv, "psr_doppler_car_rtk_node"); 
-    ROS_INFO("\033[1;32m----> psr_doppler_car_rtk_dyna_node Started.\033[0m"); 
+    ros::init(argc, argv, "psr_doppler_fusion_gnssleo_node"); 
+    ROS_INFO("\033[1;32m----> psr_doppler_fusion_gnssleo_node Started.\033[0m"); 
     // ...
-    psr_doppler_car_rtk psr_doppler_car_rtk;
+    psr_doppler_fusion psr_doppler_fusion;
     ros::spin();
     return 0;
 }

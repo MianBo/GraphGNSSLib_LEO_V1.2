@@ -10,7 +10,7 @@ help:
 	@echo ""
 
 build:
-	@docker build --tag ros:GraphGNSSLib -f ./Dockerfile ..
+	@docker build --tag ros:GraphGNSSLib_LEO -f ./Dockerfile ..
 
 clean:
-	@docker rmi -f ros:GraphGNSSLib
+	@docker rmi -f ros:GraphGNSSLib_LEO

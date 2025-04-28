@@ -1,3 +1,3 @@
 #!/bin/bash
-docker container stop graph1
-docker container rm graph1
+sudo docker container stop graphlib_leo
+sudo docker container rm graphlib_leo

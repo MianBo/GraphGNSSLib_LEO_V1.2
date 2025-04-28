@@ -111,9 +111,6 @@ static const char rcsid[]="$Id:$";
 #define IL(f,opt)   (NP(opt)+NI(opt)+NT(opt)+(f))   /* receiver h/w bias */
 #define IB(s,f,opt) (NR(opt)+MAXSAT*(f)+(s)-1) /* phase bias (s:satno,f:freq) */
 
-
-
-
 #ifdef EXTGSI
 
 extern int resamb_WLNL(rtk_t *rtk, const obsd_t *obs, const int *sat,
@@ -138,50 +135,15 @@ static FILE *fp_stat=NULL;       /* rtk status file pointer */
 static char file_stat[1024]="";  /* rtk status file original path */
 static gtime_t time_stat={0};    /* rtk status file time */
 
-std::string RTK_folder;
 ros::Subscriber sub_rtk_info;
 ros::Publisher pub_rtkpos_odometry_solution;//pub_rtkpos_odometry_float, pub_rtkpos_odometry_integer;
 ros::Publisher pub_station_raw;
 GNSS_Tools m_GNSS_Tools_rtkpos; // utilities
 
-const ros::Time gps_epoch(315964800, 0); // 315964800 from 1970/1/1 to 1980/1/6
-ros::Time GPSTimeToROSTime(double gps_time) {
-    int gps_week = static_cast<int>(gps_time / 604800);
-    double gps_seconds = gps_time - gps_week * 604800;
-
-    // Calculate the total seconds in ros to the given GPS time
-    double total_seconds = gps_week * 604800 + gps_seconds+ gps_epoch.toSec();    
-
-    // Transform the total seconds to seconds and nanoseconds
-    int64_t sec = static_cast<int64_t>(total_seconds);
-    int64_t nsec = static_cast<int64_t>((total_seconds - sec) * 1e9);
-
-    // Create a ROS time object
-    ros::Time ros_time(sec, nsec);
-    
-    return ros_time;
-}
-
-extern void initializeRTKFolder(void) {
-    std::string RTK_folder;
-    if (!ros::param::get("~RTK_folder", RTK_folder)) {
-        std::cerr << "ROS parameter 'RTK_folder' is not set!" << std::endl;
-        return;
-    }
-
-    FILE* gnss_only_rtk = fopen(RTK_folder.c_str(), "w+");
-    if (gnss_only_rtk == NULL) {
-        perror("Error opening file");
-        return;
-    }
-    fclose(gnss_only_rtk);
-}
-
 extern void rtkposRegisterPub(ros::NodeHandle &n)
 {
     // pub_rtkpos_odometry_float = n.advertise<nav_msgs::Odometry>("ENUFloatRTK", 1000); // rtk_float_odometry
     pub_rtkpos_odometry_solution = n.advertise<nav_msgs::Odometry>("ENUSolutionRTK", 1000); // rtk_float_odometry
-    //pub_rtkpos_odometry_ENU_solution = n.advertise<nav_msgs::Odometry>("ECEFSolutionRTK", 1000); // rtk_float_odometry
     // pub_rtkpos_odometry_integer = n.advertise<nav_msgs::Odometry>("ENUIntegerRTK", 1000); //rtk_integer_odometry
     pub_station_raw = n.advertise<nlosexclusion::GNSS_Raw_Array>("GNSSPsrCarStation1", 1000);
 }
@@ -1809,7 +1771,6 @@ static int relpos(rtk_t *rtk, const obsd_t *obs, int nu, int nr,
         }
         
     }
-    gnss_data.header.stamp = GPSTimeToROSTime(current_week*604800+current_tow);
     pub_station_raw.publish(gnss_data);
     #endif
     
@@ -1948,38 +1909,21 @@ static int relpos(rtk_t *rtk, const obsd_t *obs, int nu, int nr,
 
     /* Weisong: publish solution */
     Eigen::Matrix<double, 3, 1> ECEF;
-    Eigen::Matrix<double, 3, 1> ENU_ref;
-    Eigen::Matrix<double, 3, 1> ENU;
     ECEF<<rtk->sol.rr[0], rtk->sol.rr[1], rtk->sol.rr[2];
-    ENU_ref<< ref_lon, ref_lat, ref_alt;
-    ENU = m_GNSS_Tools_rtkpos.ecef2enu(ENU_ref, ECEF);
     double cur_time = static_cast<double>(rtk->sol.time.time) + rtk->sol.time.sec;
     nav_msgs::Odometry odometry;
     odometry.header.frame_id = "map";
     odometry.header.stamp = ros::Time(cur_time);
     odometry.child_frame_id = "map";
-    odometry.pose.pose.position.x = ENU(0);// ECEF(0); //
-    odometry.pose.pose.position.y = ENU(1);// ECEF(1); // 
-    odometry.pose.pose.position.z = ENU(2);// ECEF(2); // 
+    odometry.pose.pose.position.x = ECEF(0); // ENU(0);
+    odometry.pose.pose.position.y = ECEF(1); // ENU(1);
+    odometry.pose.pose.position.z = ECEF(2); // ENU(2);
     odometry.pose.covariance[0] = rtk->sol.qr[0];
     odometry.pose.covariance[1] = rtk->sol.qr[1];
     odometry.pose.covariance[2] = rtk->sol.qr[2];
 
     pub_rtkpos_odometry_solution.publish(odometry);
-    std::string RTK_folder;
-    ros::param::get("~RTK_folder", RTK_folder);
-    FILE* gnss_only_rtk = fopen(RTK_folder.c_str(), "a+");
-    if (gnss_only_rtk == NULL) {
-        perror("Error opening RTK file");
-        std::cout << "Cannot open RTK file: " << RTK_folder << std::endl;
-        return 0;
-    }
-    double pos[3];
-    ecef2pos(rtk->sol.rr,pos);
-    fprintf(gnss_only_rtk, "%d,%d,%.9f,%.9f,%.9f,", int(current_week), int(current_tow),pos[0]*R2D,pos[1]*R2D,pos[2]);
-    fprintf(gnss_only_rtk, "%.9f,%.9f,%.9f \n", ENU[0], ENU[1],ENU[2]);
-    fflush(gnss_only_rtk);
-
+    
     free(rs); free(dts); free(var); free(y); free(e); free(azel);
     free(xp); free(Pp);  free(xa);  free(v); free(H); free(R); free(bias);
     
@@ -2114,6 +2058,7 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
     */
     for (nu=0;nu   <n&&obs[nu   ].rcv==1;nu++)
     {
+        // LOG(INFO) <<"sat id->  "<<float(obs[nu].sat);
         // LOG(INFO) <<"obs[nu].L[0]->  "<<obs[nu].L[0];
         // LOG(INFO) <<"obs[nu].L[1]->  "<<obs[nu].L[1];
         // LOG(INFO) <<"obs[nu].L[2]->  "<<obs[nu].L[2];

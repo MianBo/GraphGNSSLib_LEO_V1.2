@@ -42,7 +42,7 @@
 /* Reference from NovAtel GNSS/INS */
 #include <novatel_msgs/INSPVAX.h> // novatel_msgs/INSPVAX
 #include "gnss_tools.h"
-#include <nlosExclusion/GNSS_Raw_Array.h>
+#include <nlosexclusion/GNSS_Raw_Array.h>
 #include <geometry_msgs/Point32.h>
 #include <stdio.h>
 #include <queue>
@@ -75,17 +75,17 @@ class rosbag_generator
     /* ros subscriber */
     ros::Publisher pub_WLSENU, pub_FGOENU, pub_global_path, pubGNSSRaw, pubStationGNSSRaw, pubDopplerVel;
     
-    std::map<int, nlosExclusion::GNSS_Raw_Array> gnss_raw_map;
+    std::map<int, nlosexclusion::GNSS_Raw_Array> gnss_raw_map;
     std::map<int, nav_msgs::Odometry> doppler_map;
-    std::map<int, nlosExclusion::GNSS_Raw_Array> station_gnss_raw_map;
+    std::map<int, nlosexclusion::GNSS_Raw_Array> station_gnss_raw_map;
 
     GNSS_Tools m_GNSS_Tools; // utilities  
 
     /* subscriber */
-    std::unique_ptr<message_filters::Subscriber<nlosExclusion::GNSS_Raw_Array>> gnss_raw_array_sub;
+    std::unique_ptr<message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>> gnss_raw_array_sub;
     std::unique_ptr<message_filters::Subscriber<nav_msgs::Odometry>> doppler_sub;
-    std::unique_ptr<message_filters::Subscriber<nlosExclusion::GNSS_Raw_Array>> station_gnss_raw_array_sub;
-    std::unique_ptr<message_filters::TimeSynchronizer<nlosExclusion::GNSS_Raw_Array, nlosExclusion::GNSS_Raw_Array, nav_msgs::Odometry>> syncdoppler2GNSSRaw;
+    std::unique_ptr<message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>> station_gnss_raw_array_sub;
+    std::unique_ptr<message_filters::TimeSynchronizer<nlosexclusion::GNSS_Raw_Array, nlosexclusion::GNSS_Raw_Array, nav_msgs::Odometry>> syncdoppler2GNSSRaw;
 
     /* thread lock for data safe */
     std::mutex m_gnss_raw_mux;
@@ -118,11 +118,11 @@ public:
         // pub_WLSENU = nh.advertise<nav_msgs::Odometry>("WLSGoGPS", 100); // 
 
         /* subscriber of three topics  */
-        gnss_raw_array_sub.reset(new message_filters::Subscriber<nlosExclusion::GNSS_Raw_Array>(nh, "/gnss_preprocessor_node/GNSSPsrCarRov1", 10000));
+        gnss_raw_array_sub.reset(new message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>(nh, "/gnss_preprocessor_node/GNSSPsrCarRov1", 10000));
         doppler_sub.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh, "/gnss_preprocessor_node/GNSSDopVelRov1", 10000));
         /* GNSS measurements from station (reference end) */
-        station_gnss_raw_array_sub.reset(new message_filters::Subscriber<nlosExclusion::GNSS_Raw_Array>(nh, "/gnss_preprocessor_node/GNSSPsrCarStation1", 10000)); // measurements from station
-        syncdoppler2GNSSRaw.reset(new message_filters::TimeSynchronizer<nlosExclusion::GNSS_Raw_Array, nlosExclusion::GNSS_Raw_Array, nav_msgs::Odometry>(*gnss_raw_array_sub, *station_gnss_raw_array_sub, *doppler_sub, 32));
+        station_gnss_raw_array_sub.reset(new message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>(nh, "/gnss_preprocessor_node/GNSSPsrCarStation1", 10000)); // measurements from station
+        syncdoppler2GNSSRaw.reset(new message_filters::TimeSynchronizer<nlosexclusion::GNSS_Raw_Array, nlosexclusion::GNSS_Raw_Array, nav_msgs::Odometry>(*gnss_raw_array_sub, *station_gnss_raw_array_sub, *doppler_sub, 32));
         syncdoppler2GNSSRaw->registerCallback(boost::bind(&rosbag_generator::gnssraw_doppler_msg_callback,this, _1, _2, _3));
 
         /* subscribe to span-cpt message */
@@ -132,10 +132,10 @@ public:
         pub_global_path = nh.advertise<nav_msgs::Path>("/FGOGlobalPath", 100); // 
 
         /* publish the raw gnss data*/
-        pubGNSSRaw = nh.advertise<nlosExclusion::GNSS_Raw_Array>("/rosbag_generator_node/GNSSPsrCarRov1", 100); //
+        pubGNSSRaw = nh.advertise<nlosexclusion::GNSS_Raw_Array>("/rosbag_generator_node/GNSSPsrCarRov1", 100); //
 
         /* publish the raw gnss data from station*/ 
-        pubStationGNSSRaw = nh.advertise<nlosExclusion::GNSS_Raw_Array>("/rosbag_generator_node/GNSSPsrCarStation1", 100); // 
+        pubStationGNSSRaw = nh.advertise<nlosexclusion::GNSS_Raw_Array>("/rosbag_generator_node/GNSSPsrCarStation1", 100); // 
 
         /* publish the Doppler gnss data from station*/ 
         pubDopplerVel = nh.advertise<nav_msgs::Odometry>("/rosbag_generator_node/GNSSDopVelRov1", 100); // 
@@ -173,12 +173,12 @@ public:
         std::cout<<"GPS seconds from Rosbag" << gpsSec << "\n";
         if(finishGNSSReader)
         {
-            std::map<int, nlosExclusion::GNSS_Raw_Array>::iterator GNSSiter_pr;
+            std::map<int, nlosexclusion::GNSS_Raw_Array>::iterator GNSSiter_pr;
             GNSSiter_pr = gnss_raw_map.begin();
             int length = gnss_raw_map.size();
 
             /* find rover gnss data and publish */
-            nlosExclusion::GNSS_Raw_Array roverGNSSRawData;
+            nlosexclusion::GNSS_Raw_Array roverGNSSRawData;
             GNSSiter_pr = gnss_raw_map.find(gpsSec);
             if(GNSSiter_pr!=gnss_raw_map.end())
             {
@@ -187,7 +187,7 @@ public:
             }
 
             /* find station gnss data and publish */
-            nlosExclusion::GNSS_Raw_Array stationGNSSRawData;
+            nlosexclusion::GNSS_Raw_Array stationGNSSRawData;
             GNSSiter_pr = station_gnss_raw_map.find(gpsSec);
             if(GNSSiter_pr!=station_gnss_raw_map.end())
             {
@@ -213,7 +213,7 @@ public:
    * @return void
    @ 
    */
-   void gnssraw_doppler_msg_callback(const nlosExclusion::GNSS_Raw_ArrayConstPtr& gnss_msg, const nlosExclusion::GNSS_Raw_ArrayConstPtr& station_gnss_msg, const nav_msgs::OdometryConstPtr& doppler_msg)
+   void gnssraw_doppler_msg_callback(const nlosexclusion::GNSS_Raw_ArrayConstPtr& gnss_msg, const nlosexclusion::GNSS_Raw_ArrayConstPtr& station_gnss_msg, const nav_msgs::OdometryConstPtr& doppler_msg)
     {
         m_gnss_raw_mux.lock();
 

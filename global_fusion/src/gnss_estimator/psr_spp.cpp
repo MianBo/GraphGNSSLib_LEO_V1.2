@@ -39,7 +39,7 @@
 /* Reference from NovAtel GNSS/INS */
 #include <novatel_msgs/INSPVAX.h> // novatel_msgs/INSPVAX
 #include "gnss_tools.h"
-#include <nlosExclusion/GNSS_Raw_Array.h>
+#include <nlosexclusion/GNSS_Raw_Array.h>
 
 #include <geometry_msgs/Point32.h>
 #include <stdio.h>
@@ -84,8 +84,8 @@ class gnssSinglePointPositioning
     ros::Subscriber gnss_raw_sub;
     ros::Subscriber leo_raw_sub;//add by Yixin
     ros::Publisher pub_WLS, pub_FGO;
-    std::queue<nlosExclusion::GNSS_Raw_ArrayConstPtr> gnss_raw_buf;
-    std::map<double, nlosExclusion::GNSS_Raw_Array> gnss_raw_map;
+    std::queue<nlosexclusion::GNSS_Raw_ArrayConstPtr> gnss_raw_buf;
+    std::map<double, nlosexclusion::GNSS_Raw_Array> gnss_raw_map;
 
     std::mutex m_gnss_raw_mux;
     std::mutex optimize_mux;
@@ -210,7 +210,7 @@ public:
   gnssSinglePointPositioning()
   {
       gnss_raw_sub = nh.subscribe("/gnss_preprocessor_node/GNSSPsrCarRov1", 500, &gnssSinglePointPositioning::gnss_raw_msg_callback, this); // call callback for gnss raw msg
-      //leo_raw_sub = nh.subscribe("/gnss_preprocessor_node/LEOPsrCarRov1", 500, &gnssSinglePointPositioning::gnss_raw_msg_callback, this); // call callback for leo raw msg add by Yixin
+      //leo_raw_sub = nh.subscribe("/leo_raw_publisher_node/LEOPsrCarRov1", 500, &gnssSinglePointPositioning::gnss_raw_msg_callback, this); // call callback for leo raw msg add by Yixin
       optimizationThread = std::thread(&gnssSinglePointPositioning::solvePptimization, this);
 
       pub_WLS = nh.advertise<nav_msgs::Odometry>("WLS_spp", 100); // 
@@ -231,7 +231,7 @@ public:
    * @return void
    @ 
    */
-    void gnss_raw_msg_callback(const nlosExclusion::GNSS_Raw_ArrayConstPtr& msg)
+    void gnss_raw_msg_callback(const nlosexclusion::GNSS_Raw_ArrayConstPtr& msg)
     {
         m_gnss_raw_mux.lock();
         gnss_frame++;
@@ -300,11 +300,11 @@ public:
                 //     state_array.push_back(a);
                 // }
 
-                std::map<double, nlosExclusion::GNSS_Raw_Array>::iterator iter;
+                std::map<double, nlosexclusion::GNSS_Raw_Array>::iterator iter;
                 iter = gnss_raw_map.begin();
                 for(int i = 0;  i < length; i++,iter++) // initialize
                 {
-                    nlosExclusion::GNSS_Raw_Array gnss_data = (iter->second);
+                    nlosexclusion::GNSS_Raw_Array gnss_data = (iter->second);
                     Eigen::MatrixXd eWLSSolutionECEF = m_GNSS_Tools.WeightedLeastSquare(
                                                 m_GNSS_Tools.getAllPositions(gnss_data),
                                                 m_GNSS_Tools.getAllMeasurements(gnss_data),
@@ -319,11 +319,11 @@ public:
                     problem.AddParameterBlock(state_array[i],5);
                 }
 
-                std::map<double, nlosExclusion::GNSS_Raw_Array>::iterator iter_pr;
+                std::map<double, nlosexclusion::GNSS_Raw_Array>::iterator iter_pr;
                 iter_pr = gnss_raw_map.begin();
                 for(int m = 0;  m < length; m++,iter_pr++) // 
                 {
-                    nlosExclusion::GNSS_Raw_Array gnss_data = (iter_pr->second);
+                    nlosexclusion::GNSS_Raw_Array gnss_data = (iter_pr->second);
                     MatrixXd weight_matrix; //goGPS weighting
                     weight_matrix = m_GNSS_Tools.cofactorMatrixCal_WLS(gnss_data, "WLS"); //goGPS
                     std::cout << "weight_matrix: rows = " << weight_matrix.rows() << ", cols = " << weight_matrix.cols() << std::endl;//add by Yixin

@@ -9,7 +9,7 @@
  *******************************************************/
 
 #define D2R 3.1415926/180.0
-#include <nlosExclusion/GNSS_Raw_Array.h>
+#include <nlosexclusion/GNSS_Raw_Array.h>
 // google implements commandline flags processing.
 #include <gflags/gflags.h>
 // google loging tools
@@ -28,7 +28,7 @@ GNSS_Tools m_GNSS_Tools; // utilities
 class FactorGraph{
 public:
     /* continuous data stream */
-    std::map<double, nlosExclusion::GNSS_Raw_Array> gnss_raw_map;
+    std::map<double, nlosexclusion::GNSS_Raw_Array> gnss_raw_map;
     std::map<double, nav_msgs::Odometry> doppler_map;
 
     /* Ceres solver object */
@@ -80,7 +80,7 @@ public:
     }   
 
     /* input gnss raw (pseudorange/carrier-phase) data  */
-    bool input_gnss_raw_data(nlosExclusion::GNSS_Raw_Array GNSS_data, double timestamp)
+    bool input_gnss_raw_data(nlosexclusion::GNSS_Raw_Array GNSS_data, double timestamp)
     {
         if(timestamp<0) return false;
         else 
@@ -179,14 +179,14 @@ public:
     /* initialize the previous optimzied states */
     bool initializeOldGraph()
     {
-        std::map<double, nlosExclusion::GNSS_Raw_Array>::iterator iter_pr;
+        std::map<double, nlosexclusion::GNSS_Raw_Array>::iterator iter_pr;
         iter_pr = gnss_raw_map.begin();
         int length = measSize;
 
         /* tranverse the stateArray */
         for(int m = 0;  m < length; m++,iter_pr++) // 
         {
-            nlosExclusion::GNSS_Raw_Array gnss_data = (iter_pr->second);
+            nlosexclusion::GNSS_Raw_Array gnss_data = (iter_pr->second);
             double time = gnss_data.GNSS_Raws[0].GNSS_time;
 
             /* initialize the state using previously optimized state */
@@ -209,13 +209,13 @@ public:
     bool initializeNewlyAddedGraph()
     {
         int length = measSize;
-        std::map<double, nlosExclusion::GNSS_Raw_Array>::iterator iter;
+        std::map<double, nlosexclusion::GNSS_Raw_Array>::iterator iter;
         iter = gnss_raw_map.begin();
         for(int i = 0; i <length; i++,iter++)
         {
             if(i>=(lastFactorGraphSize-1))
             {
-                nlosExclusion::GNSS_Raw_Array gnss_data = (iter->second);
+                nlosexclusion::GNSS_Raw_Array gnss_data = (iter->second);
                 Eigen::MatrixXd eWLSSolutionECEF = m_GNSS_Tools.WeightedLeastSquare(
                                     m_GNSS_Tools.getAllPositions(gnss_data),
                                     m_GNSS_Tools.getAllMeasurements(gnss_data),
@@ -287,12 +287,12 @@ public:
     bool addPseudorangeFactors(ceres::Problem& problem)
     {
         /* add pseudorange factor */
-        std::map<double, nlosExclusion::GNSS_Raw_Array>::iterator iter_pr;
+        std::map<double, nlosexclusion::GNSS_Raw_Array>::iterator iter_pr;
         iter_pr = gnss_raw_map.begin();
         int length = measSize;
         for(int m = 0;  m < length; m++,iter_pr++) // 
         {
-            nlosExclusion::GNSS_Raw_Array gnss_data = (iter_pr->second);
+            nlosexclusion::GNSS_Raw_Array gnss_data = (iter_pr->second);
             // gps_sec_array[m] = int(gnss_data.GNSS_Raws[0].GNSS_time);
             state_gps_sec_vec.push_back(int(gnss_data.GNSS_Raws[0].GNSS_time));
             MatrixXd weight_matrix; //goGPS weighting
@@ -311,7 +311,7 @@ public:
                 double pseudorange = 0;
                 if(m_GNSS_Tools.PRNisGPS(gnss_data.GNSS_Raws[i].prn_satellites_index)) sat_sys = "GPS";
                 else if (m_GNSS_Tools.PRNisBeidou(gnss_data.GNSS_Raws[i].prn_satellites_index)) sat_sys = "BeiDou";
-                else if (m_GNSS_Tools.PRNisStarlink(gnss_data.GNSS_Raws[i].prn_satellites_index)) sat_sys = "Starlink";
+                else if (m_GNSS_Tools.PRNisLEO(gnss_data.GNSS_Raws[i].prn_satellites_index)) sat_sys = "LEO";
                 else sat_sys = "";
                 s_g_x = gnss_data.GNSS_Raws[i].sat_pos_x;
                 s_g_y = gnss_data.GNSS_Raws[i].sat_pos_y;
@@ -375,14 +375,14 @@ public:
         lastFactorGraphSize = measSize;
 
         /* get time from data stream */
-        std::map<double, nlosExclusion::GNSS_Raw_Array>::iterator iter_pr;
+        std::map<double, nlosexclusion::GNSS_Raw_Array>::iterator iter_pr;
         iter_pr = gnss_raw_map.begin();
         int length = measSize;
 
         /* tranverse the stateArray */
         for(int m = 0;  m < length; m++,iter_pr++) // 
         {
-            nlosExclusion::GNSS_Raw_Array gnss_data = (iter_pr->second);
+            nlosexclusion::GNSS_Raw_Array gnss_data = (iter_pr->second);
             double time = gnss_data.GNSS_Raws[0].GNSS_time;
 
             /* if the state vector is empty, override */
@@ -438,6 +438,19 @@ public:
         return FGOENU;
     }
 
+    /* get the latest state in ECEF */
+    Eigen::Matrix<double ,3,1> getLatestStateECEF()
+    {
+        int length = measSize;
+        Eigen::Matrix<double ,3,1> FGOECEF;
+        Eigen::Matrix<double, 3,1> state;
+        state<< state_array[length-1][0], 
+                state_array[length-1][1], 
+                state_array[length-1][2];
+        FGOECEF = state;    
+        return FGOECEF;
+    }
+
      /* print the latest state in ENU */
     bool printLatestStateENU()
     {
@@ -450,6 +463,24 @@ public:
         FGOENU = m_GNSS_Tools.ecef2enu(ENULlhRef, state);    
         std::cout << "FGOENU-> "<< FGOENU<< std::endl;    
         return true;
+    }
+
+    ros::Time GPSTimeToROSTime(double gps_time) 
+    {
+        int gps_week = static_cast<int>(gps_time / 604800);
+        double gps_seconds = gps_time - gps_week * 604800;
+        const ros::Time gps_epoch(315964800, 0); // 315964800 from 1970/1/1 to 1980/1/6
+        // Calculate the total seconds in ros to the given GPS time
+        double total_seconds = gps_week * 604800 + gps_seconds+ gps_epoch.toSec();    
+    
+        // Transform the total seconds to seconds and nanoseconds
+        int64_t sec = static_cast<int64_t>(total_seconds);
+        int64_t nsec = static_cast<int64_t>((total_seconds - sec) * 1e9);
+    
+        // Create a ROS time object
+        ros::Time ros_time(sec, nsec);
+        
+        return ros_time;
     }
 
     /* get the path of FGO in ENU */
@@ -471,9 +502,9 @@ public:
             pose_stamped.header.frame_id = "map";
             pose_stamped.pose.position.x = FGOENU(0);
             pose_stamped.pose.position.y = FGOENU(1);
-            pose_stamped.pose.position.z = 10;
+            pose_stamped.pose.position.z = FGOENU(2);
             fgo_path.poses.push_back(pose_stamped);
-            std::cout << "pose_stamped- FGO-> "<< std::endl<< pose_stamped;
+            //std::cout << "pose_stamped- FGO-> "<< std::endl<< pose_stamped;
         }
               
         return fgo_path;
@@ -526,6 +557,11 @@ public:
     void logResults(std::string logPath)
     {
         std::ofstream foutC(logPath, std::ios::ate);
+        if (!foutC.is_open()) {
+            std::cerr << "Error: Failed to open file: " << logPath << std::endl;
+            return;
+        }
+
         foutC.setf(std::ios::fixed, std::ios::floatfield);
         
         int length = measSize;
