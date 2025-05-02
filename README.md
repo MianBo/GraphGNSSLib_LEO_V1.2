@@ -14,7 +14,7 @@ The package is based on **[GraphGNSSLib](https://github.com/weisongwen/GraphGNSS
  
 **Authors**: [Yixin Gao](https://polyu-taslab.github.io/members/gao_yixin.html),[Weisong Wen](https://www.polyu.edu.hk/aae/people/academic-staff/dr-wen-weisong/), from the [Trustworthy AI and Autonomous Systems (TAS) Laboratory]([https://polyu-taslab.github.io/]), The Hong Kong Polytechnic University. 
 
-**Related Papers:** (paper is not exactly same with code)
+**Related Papers:** 
   - Wen, W., & Hsu, L. T. (2021, May). [Towards robust GNSS positioning and Real-time kinematic using factor graph optimization](https://ieeexplore.ieee.org/abstract/document/9562037). In 2021 IEEE International Conference on Robotics and Automation (ICRA) (pp. 5884-5890). IEEE. 
   - Wen, W., Zhang, G., & Hsu, L. T. (2021). [GNSS outlier mitigation via graduated non-convexity factor graph optimization](https://ieeexplore.ieee.org/abstract/document/9627801). IEEE Transactions on Vehicular Technology, 71(1), 297-310.
   - Zhong, Y., Wen, W., Ng, H. F., Bai, X., & Hsu, L. T. (2022, September). [Real-time Factor Graph Optimization Aided by Graduated Non-convexity Based Outlier Mitigation for Smartphone Decimeter Challenge](https://www.ion.org/publications/abstract.cfm?articleID=18382). In Proceedings of the 35th International Technical Meeting of the Satellite Division of The Institute of Navigation (ION GNSS+ 2022) (pp. 2339-2348).
@@ -26,6 +26,9 @@ The package is based on **[GraphGNSSLib](https://github.com/weisongwen/GraphGNSS
 </p>
 
 <center> Software flowchart of GraphGNSSLib_LEO, more information please refer to mannual and paper.</center>
+
+## 0. Suggestion
+If you are not familiar with ROS, we highly recommend using our docker container to enjoy GraphGNSSLib_LEO. For the details, please go to the branch docker [4. Docker Support](#4.-Docker-Support.)
 
 
 ## 1. Prerequisites
@@ -83,21 +86,26 @@ The GNSS-LEO positioning via SPP and FGO is validated using static dataset colle
   - measurements considered: pseudorange and Doppler measurements
   - result is saved by default
     ```c++
-    $(find global_fusion)/dataset/2021_0521_0607/FGO_trajectoryllh_psr_dop_fusion.csv
+    $(find global_fusion)/dataset/2021_0521_0607/GNSSLEO__SPP_trajectoryllh_psr_dop_fusion.csv
     
     ```
  We provide some simulated LEO data, please enjoy it!
    ```bash
   source ~/GraphGNSSLib_LEO/devel/setup.bash
-  # read GNSS raw data, LEO raw data and combine them as ROS topic
   # the GNSS-only SPP positioning result will be displayed in rviz
-  roslaunch global_fusion data_Whampoa_20210521_GNSS only.launch
-  # You can record them as rosbag for usage in the following psr_doppler_fusion
-  rosbag record -O gnss_leo_data.bag /gnssLEOmsg_combination_node/GNSS_LEO_PsrCarRov /gnssLEOmsg_combination_node/GNSS_LEO_Dopp_Array
-  # You can also record all the topic for the following evaluation
-  rosbag record -O GNSS_onlyspp_combine_doppmsg0209.bag -a
+  roslaunch global_fusion data_Whampoa_20210521_GNSS_only.launch
+  # You can record them as rosbag for usage in the following 
+  rosbag record -a
+  ```
+  If you want to use the LEO-GNSS integrated data, you can launch with the following steps:
+  ```bash
+  source ~/GraphGNSSLib_LEO/devel/setup.bash
   # run pseudorange and doppler fusion
   roslaunch global_fusion data_Whampoa_20210521_GNSSLEO.launch
+  # You can also record all the topic for the following evaluation
+  rosbag record -a
+  # read GNSS raw data, LEO raw data and combine them as ROS topic
+  roslaunch global_fusion data_Whampoa_20210521_GNSSLEO.launch.launch
   ```
 
 <p align="center">
@@ -113,9 +121,9 @@ The positioning results with different mathods are displayed in rviz.
   The result is recorded in `GNSS_only_WLS_result.csv`
   - GNSS only positioning using RTK with the red arrow in topic **/gnss_preprocessor_node/ENUIntegerRTK**
   - GNSS and LEO positioning using SPP with the green arrow in topic **/WLS_spp_psr**
-  The result is recorded in `GNSS_LEO_psr_spp_result.csv`
-  - GNSS positioning using FGO with purple curve in topic **/FGOGlobalPath**. 
-  The result is recorded in `FGO_trajectoryllh_psr_dop_fusion.csv`
+  The result is recorded in `GNSSLEO__SPP_trajectoryllh_psr_dop_fusion.csv`
+  - GNSS and LEO positioning using FGO with purple curve in topic **/FGOGlobalPath**. 
+  The result is recorded in `GNSSLEO_FGO_trajectoryllh_psr_dopp_fusion.csv`
   
 Please modify the file path for the result to suit your requirements.
 
@@ -132,14 +140,38 @@ Trajectories of three methods (GNSS-only SPP using pseudorange measurements with
 
 Positioning Error of Different method: Orange dots from GNSS-only SPP, Yellow dots from GNSS-LEO SPP, Purple dots from GNSS-LEO FGO.
 
+## 4. Docker Support
+ To run GraphGNSSLib_LEO with docker, first make sure  [docker](https://docs.docker.com/install/linux/docker-ce/ubuntu/) are installed on your machine. If you want to use the docker to run the global_fusion:
+```bash
+
+cd ~/catkin_ws/src/GraphGNSSLib_LEO/docker
+make build
+sudo -E ./start.bash #Do not delete " -E "
+source devel/setup.bash
+# run pseudorange and doppler fusion
+roslaunch global_fusion data_Whampoa_20210521_GNSSLEO.launch
+# you should open another ternimal to enter the docker.
+# read GNSS raw data and publish as ROS topic
+roslaunch global_fusion leo_raw_publisher.launch
+```
+
+  Also, there is a [video](https://www.youtube.com/watch?v=WMM2de_SxTw) showing the demo after you have built the docker_file in the directory GraphGNSSLib/docker
+
+  If you want to restart the container, please stop it first:
+  ```bash
+sudo ./stop.bash
+#then restart it
+sudo -E ./start.bash 
+```
+ The directory  ~/shared_dir is created to connect the container and the host . In the container, it is located at  ~/graph1/shared_dir, you can also download the code to shared_dir and compile the program in the container (Recommended for those who are interested in making changes to the source code)
 
 
-## 7. Acknowledgements
+## 5. Acknowledgements
 We use [Ceres-solver](http://ceres-solver.org/) for non-linear optimization and [RTKLIB](http://www.rtklib.com/) for GNSS data decoding, etc. Some functions are originated from [VINS-mono](https://github.com/HKUST-Aerial-Robotics/VINS-Mono). The [rviz_satellite](https://github.com/nobleo/rviz_satellite) is used for visualization. We based GNSS FGO proposed in [GraphGNSSLib](https://github.com/weisongwen/GraphGNSSLib) for positioning.
 
 If there is any thing inappropriate, please contact [Yixin GAO](https://polyu-taslab.github.io/members/gao_yixin.html) through yixin.gao@connect.polyu.hk or [Weisong WEN](https://weisongwen.wixsite.com/weisongwen) through welson.wen@polyu.edu.hk.
 
-## 8. License
+## 6. License
 The source code is released under [GPLv3](http://www.gnu.org/licenses/) license. We are still working on improving the code reliability. 
 
 For any technical issues, please contact Yixin GAO <yixin.gao@connect.polyu.hk>, from the [Trustworthy AI and Autonomous Systems (TAS) Laboratory]([https://polyu-taslab.github.io/]), The Hong Kong Polytechnic University. 
