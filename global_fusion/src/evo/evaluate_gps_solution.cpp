@@ -12,7 +12,7 @@
 #include <iostream>
 #include <string>  
 #include <fstream>
-#include<sstream>
+#include <sstream>
 #include <stdlib.h>
 #include <iomanip>
 
@@ -26,7 +26,7 @@
 // google eigen
 #include <Eigen/Eigen>
 #include <Eigen/Dense>
-#include<Eigen/Core>
+#include <Eigen/Core>
 
 // google implements commandline flags processing.
 #include <gflags/gflags.h>
@@ -75,19 +75,19 @@ using namespace std;
 
 class evaluate_gps_solution
 {
-    ros::NodeHandle nh;
+    ros::NodeHandle nh; // 初始化ROS句柄
 
-    Eigen::Matrix<double, 3,1> ENU_ref;
-    
+    Eigen::Matrix<double, 3,1> ENU_ref; // ENU参考点
+
     /* get reference solution */
-    std::thread optimizationThread;
+    std::thread optimizationThread; // 优化线程
 
-    GNSS_Tools m_GNSS_Tools; // utilities
+    GNSS_Tools m_GNSS_Tools; // GNSS工具类初始化，原代码在/include/gnss_tools.h中规定，包括一大堆处理函数
 
 public:
     struct Solution
     {
-        double timestamp; // float timestamp
+        double timestamp; // float timestamp 时间戳
         double gps_week; // gps week 
         double gps_sec; // gps second
         double longitude; 
@@ -95,27 +95,26 @@ public:
         double altitude;
     };
 
-    std::map<int, Solution> m_solutions_Vec;
-    std::map<int, Solution> m_gt_solutions_Vec;
+    std::map<int, Solution> m_solutions_Vec;    // 解算结果
+    std::map<int, Solution> m_gt_solutions_Vec; // 真实坐标数据
 
-    std::string sol_folder;
-    std::string gt_sol_folder;
+    std::string sol_folder; // 解算结果文件夹路径
+    std::string gt_sol_folder; // 真实坐标文件夹路径
 
-    std::string trajectory_path;
-    std::string error_path;
+    std::string trajectory_path; // 轨迹处理路径
+    std::string error_path; // 错误处理路径
 
 public:
     evaluate_gps_solution(ros::NodeHandle& nh)
     {
-        ros::param::get("sol_folder", sol_folder);
-        ros::param::get("gt_sol_folder", gt_sol_folder);
+        // 1.从ROS的参数服务器中获取解算结果和真实坐标文件路径（在evo.launch启动文件中定义了相对路径）
+        ros::param::get("sol_folder", sol_folder); 
+        ros::param::get("gt_sol_folder", gt_sol_folder); 
 
         ros::param::get("trajectory_path", trajectory_path);
         ros::param::get("error_path", error_path);
-
-
+        // 2.启动优化线程执行 optimization参数
         optimizationThread = std::thread(&evaluate_gps_solution::optimization, this);
-
         //   ENU_ref<< 114.179000972, 22.3011535667, 0; // 20190428 data
         //   ENU_ref<<-2414266.9200, 5386768.9870, 2407460.0310;
         /* Dynamic data collected in TST*/
@@ -127,16 +126,17 @@ public:
         /* Kowloon Tong data, evaluation for GNSS-GNC (dynamic, loop) */
         // ENU_ref<< 114.179526047,22.3304807923 ,11.7615366792;
         // ENULlhRef.resize(3,1);
-        ENU_ref<< ref_lon, ref_lat, ref_alt;
+        ENU_ref << ref_lon, ref_lat, ref_alt; // 设置ENU参考坐标，注释里面给了一些能用的
         //ENU_ref<< 114.190305193, 22.301575393, 5.4704; // Changed acccording to Whampoa Position
-        getSolutionfromCSV();
-        getGroundTruthSolutionfromCSV();
-        evaluateSol();
-
-
+        // 3.获得存储GPS结算结果的CSV文件，每1s打开指定路径的文件按行读一次，提取时间，经纬度和高度信息，并将解析后的数据以gps_sec为键存入m_solutions_Vec中。
+        getSolutionfromCSV(); 
+        // 4.同上，存储在m_gt_solutions_Vec中
+        getGroundTruthSolutionfromCSV(); // 获得存储GPS真实坐标的CSV文件
+        evaluateSol(); // 调用函数进行代码评估
     }
     ~evaluate_gps_solution()
     {
+        // 析构函数。将优化线程分离
         optimizationThread.detach();
     }
 
@@ -273,33 +273,38 @@ public:
 
     void evaluateSol()
     {
+        // 文件流设置
         std::ofstream foutErrorPath(error_path, std::ios::ate);
         foutErrorPath.setf(std::ios::fixed, std::ios::floatfield);
         
         std::ofstream foutPathPath(trajectory_path, std::ios::ate);
         foutPathPath.setf(std::ios::fixed, std::ios::floatfield);
-
+        // 定义解算结果和真值结果的迭代器
         std::map<int, Solution>::iterator sol_iter, gt_sol_iter;
         int sol_epoch_size = m_solutions_Vec.size();
+        // 迭代器指向初始位置
         sol_iter = m_solutions_Vec.begin();
         gt_sol_iter = m_gt_solutions_Vec.begin();
+        // 开始遍历解算结果
         for(int i = 0; i < sol_epoch_size; i++, sol_iter++)
         {
+            // 当前解算结果的GPS秒数
             int gps_sec = int(sol_iter->first);
+            // 查找对应GPS秒数的真值结果
             gt_sol_iter = m_gt_solutions_Vec.find(gps_sec);
-            if(gt_sol_iter != m_gt_solutions_Vec.end())
+            if(gt_sol_iter != m_gt_solutions_Vec.end()) // 如果找到了对应解算结果的真值
             {
-
+                // 调用Eigen第三方库，将真值的经纬高转到ECEF和ENU坐标系中
                 Eigen::Matrix<double, 3, 1> gt_sol_llh, gt_sol_ecef, gt_sol_enu;
                 gt_sol_llh<< gt_sol_iter->second.longitude, gt_sol_iter->second.latitude, gt_sol_iter->second.altitude;
                 gt_sol_ecef = m_GNSS_Tools.llh2ecef(gt_sol_llh);
                 gt_sol_enu = m_GNSS_Tools.ecef2enu(ENU_ref, gt_sol_ecef);
-
+                // 对解算结果做同样处理
                 Eigen::Matrix<double, 3, 1> sol_llh, sol_ecef, sol_enu;
                 sol_llh << sol_iter->second.longitude, sol_iter->second.latitude, sol_iter->second.altitude;
                 sol_ecef = m_GNSS_Tools.llh2ecef(sol_llh);
                 sol_enu = m_GNSS_Tools.ecef2enu(ENU_ref, sol_ecef);
-
+                // 计算水平误差和
                 double error_2d = getMSE(sol_enu, gt_sol_enu, "2D_Error");
                 double error_3d = getMSE(sol_enu, gt_sol_enu, "3D_Error");
                 std::cout<<"get ground truth solution at apoch "<< gps_sec << "       error-> " << error_2d<<std::endl;

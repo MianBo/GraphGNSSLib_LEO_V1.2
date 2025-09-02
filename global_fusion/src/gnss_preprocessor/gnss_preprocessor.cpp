@@ -20,21 +20,22 @@
 #define ENAGLO 1 //enable GLO
 
 
-extern void postposRegisterPub(ros::NodeHandle &n);
-extern void rtkposRegisterPub(ros::NodeHandle &n);
-extern void pntposRegisterPub(ros::NodeHandle &n);
+extern void postposRegisterPub(ros::NodeHandle &n); // 后处理定位算法发布器注册
+extern void rtkposRegisterPub(ros::NodeHandle &n);  // RTK实时动态定位算法发布器注册
+extern void pntposRegisterPub(ros::NodeHandle &n);  // SPP算法发布器注册 
 
 int main(int argc, char **argv)
 {
 	
-    ros::init(argc, argv, "gnss_preprocessor_node");
+    ros::init(argc, argv, "gnss_preprocessor_node"); // 初始化ROS节点，命名为gnss_preprocessor_node
 	ros::NodeHandle nh("~");
 	ROS_INFO("\033[1;32m----> gnss_preprocessor Started.\033[0m");
 
 	/* get setup parameters */
-	int mode, nf, soltype;
-	std::string roverMeasureFile, baseMeasureFile, BeiDouEmpFile, GPSEmpFile;
+	int mode, nf, soltype; // 定位模式，频段数量，解算类型
+	std::string roverMeasureFile, baseMeasureFile, BeiDouEmpFile, GPSEmpFile; // 流动站/基准站测量文件路径，北斗/GPS星历路径
 	std::string out_folder;
+	// 从ROS服务器获得指定参数
 	nh.param("mode",   mode, 2);
 	nh.param("nf",     nf, 2);
 	nh.param("soltype",soltype, 2);
@@ -48,10 +49,10 @@ int main(int argc, char **argv)
     int n=0,i,stat;
 
 	/* input node handle */
-	postposRegisterPub(nh);
+	postposRegisterPub(nh); // 完成各类位置发布器的注册
 	rtkposRegisterPub(nh);
 	pntposRegisterPub(nh);
-	initializeRTKFolder();
+	initializeRTKFolder();  // 调用函数初始化RTK / WLS
 	initializeWLSFolder();
 	/* processing time setting */
 	double ti=0.0;						// processing interval  (s) (0:all)
