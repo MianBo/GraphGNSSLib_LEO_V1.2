@@ -89,17 +89,17 @@ int main(int argc, char **argv)
 	solopt.posf = SOLF_LLH;
 	solopt.height = 0;
 
-	char *rov="",*base="";
-	char infile_[10][1024]={""}, *infile[10];
+	char *rov="",*base=""; // 基准站和流动站的名称
+	char infile_[10][1024]={""}, *infile[10]; // 存储最多10个输入文件的路径，每个路径最大1024字符
 	char outfile[1024];
 
 	/* set input files */
 	for (i=0;i<10;i++) infile[i]=infile_[i];
 	
-	strcpy(infile[n++],strdup(roverMeasureFile.c_str()));
-	strcpy(infile[n++],strdup(baseMeasureFile.c_str()));
-	strcpy(infile[n++],strdup(BeiDouEmpFile.c_str()));
-	strcpy(infile[n++],strdup(GPSEmpFile.c_str()));
+	strcpy(infile[n++],strdup(roverMeasureFile.c_str())); // 流动站测量文件(RINEX)
+	strcpy(infile[n++],strdup(baseMeasureFile.c_str()));  // 基站测量文件
+	strcpy(infile[n++],strdup(BeiDouEmpFile.c_str()));    // 北斗星历
+	strcpy(infile[n++],strdup(GPSEmpFile.c_str()));       // GPS星历
 
 	/* if you use the RTK mode, specify the position of the station (only used by RTKLIB)
 	 * following is an example position of the base HKSC in Hong Kong */
