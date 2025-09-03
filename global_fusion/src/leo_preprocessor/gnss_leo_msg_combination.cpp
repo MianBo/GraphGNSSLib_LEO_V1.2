@@ -74,63 +74,52 @@
 class gnss_leo_msg_combination
 {
     ros::NodeHandle nh;
-
     // ros::Publisher pub_WLSENU, pub_FGOENU, pub_global_path, pubStationGNSSRaw;
-    ros::Publisher pubRoverGNSSRaw,pubStationGNSSRaw;
+    ros::Publisher pubRoverGNSSRaw,pubStationGNSSRaw; // 流动站GNSS数据 & 基站GNSS数据发布器
     /* ros subscriber */
     std::map<double, nlosexclusion::GNSS_Raw_Array> gnss_leo_raw_map;
-
     GNSS_Tools m_GNSS_Tools; // utilities
-
     /* subscriber */
+    // 订阅流动站GNSS/LEO数据和基站GNSS/LEO数据
     std::unique_ptr<message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>> rover_gnss_raw_array_sub;
     std::unique_ptr<message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>> rover_leo_raw_array_sub;
     std::unique_ptr<message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>> station_gnss_raw_array_sub;
     std::unique_ptr<message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>> station_leo_raw_array_sub;
     // std::unique_ptr<message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>> station_gnss_raw_array_sub;
-
+    // 定义时间同步策略，利用近似时间同步（ApproximateTime）来同步两个不同来源但时间戳相近的消息（流动站和基站）
     typedef message_filters::sync_policies::ApproximateTime<nlosexclusion::GNSS_Raw_Array, nlosexclusion::GNSS_Raw_Array> MySyncPolicy;
     std::shared_ptr<message_filters::Synchronizer<MySyncPolicy>> syncRoverGNSSRaw;
     std::shared_ptr<message_filters::Synchronizer<MySyncPolicy>> syncStationGNSSRaw;
     //std::unique_ptr<message_filters::TimeSynchronizer<nlosexclusion::GNSS_Raw_Array, nlosexclusion::GNSS_Raw_Array>> syncRoverGNSSRaw;
     //std::unique_ptr<message_filters::TimeSynchronizer<nlosexclusion::GNSS_Raw_Array, nlosexclusion::GNSS_Raw_Array>> syncStationGNSSRaw;
-
     /* thread lock for data safe */
     std::mutex m_gnss_raw_mux;
-
-    int gnss_frame = 0;
-    int curGPSSec = 0;
-
+    int gnss_frame = 0; // 已处理的GNSS数据帧计数
+    int curGPSSec = 0; //当前GPS秒数
     bool hasNewData = false;
-
     /* thread for data processing */
     // std::thread publishGNSSTopicThread;
-
     /* parameters to be get */
     int startGPSSec = 0;
-    int endGPSSec   = 456900; 
-
+    int endGPSSec   = 456900;  // 定义处理的GPS时间范围
     Eigen::Matrix<double, 3,1> ENU_ref;
-
-
     bool finishGNSSReader = false;
 
 public:
     gnss_leo_msg_combination(ros::NodeHandle& nh)
     {      
-        
         /* subscriber of three topics  */
+        // 创建了四个订阅者并分别订阅相关数据
         rover_gnss_raw_array_sub.reset(new message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>(nh, "/gnss_preprocessor_node/GNSSPsrCarRov1", 10000));
         rover_leo_raw_array_sub.reset(new message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>(nh, "/leo_raw_publisher_node/LEOPsrCarRov1", 10000));
         station_gnss_raw_array_sub.reset(new message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>(nh, "/gnss_preprocessor_node/GNSSPsrCarStation1", 10000));
         station_leo_raw_array_sub.reset(new message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>(nh, "/leo_raw_publisher_node/LEOPsrCarStation1", 10000));
-        
+        // 创建两个发布者分别播发流动站和基站的组合数据
         /* publish the raw gnss data*/
         pubRoverGNSSRaw = nh.advertise<nlosexclusion::GNSS_Raw_Array>("/gnss_leo_msg_combination_node/GNSS_LEO_PsrCarRov", 100); //
-
         /* publish the raw gnss data from station*/ 
         pubStationGNSSRaw = nh.advertise<nlosexclusion::GNSS_Raw_Array>("/gnss_leo_msg_combination_node/GNSS_LEO_PsrCarStation", 100); // 
-        
+        // 设置2个时间同步器，分别用于同步流动站和基站的 GNSS/LEO 数据。当同步的数据到达时，会调用相应的回调函数进行处理。
         syncRoverGNSSRaw.reset(new message_filters::Synchronizer<MySyncPolicy>(MySyncPolicy(10000), *rover_gnss_raw_array_sub, *rover_leo_raw_array_sub));
         syncRoverGNSSRaw->registerCallback(boost::bind(&gnss_leo_msg_combination::gnss_leo_rover_raw_msg_callback,this, _1, _2));
         syncStationGNSSRaw.reset(new message_filters::Synchronizer<MySyncPolicy>(MySyncPolicy(10000), *station_gnss_raw_array_sub, *station_leo_raw_array_sub));
@@ -141,7 +130,7 @@ public:
         /* reference point for ENU calculation */
         ENU_ref<< ref_lon, ref_lat, ref_alt;
 
-        /* get parameters */
+        /* get parameters */ // 从 ROS 参数服务器获取处理数据的时间范围参数
         nh.param("startGPSSec",   startGPSSec, 2);
         nh.param("endGPSSec",     endGPSSec, 2);
         // nh.param("soltype",soltype, 2);
@@ -169,45 +158,38 @@ public:
    void gnss_leo_rover_raw_msg_callback(const boost::shared_ptr<const nlosexclusion::GNSS_Raw_Array>& gnss_msg,
     const boost::shared_ptr<const nlosexclusion::GNSS_Raw_Array>& leo_msg)
     {
-        std::lock_guard<std::mutex> lock(m_gnss_raw_mux);
-    
-            
+        std::lock_guard<std::mutex> lock(m_gnss_raw_mux);  
         if(finishGNSSReader) 
         {
             //m_gnss_raw_mux.unlock();
             return;
         }
-
         hasNewData = true;
         gnss_frame++;
         double time0 = gnss_msg->GNSS_Raws[0].GNSS_time;
         double time1 = leo_msg->GNSS_Raws[0].GNSS_time;
-
-        curGPSSec = gnss_msg->GNSS_Raws[0].GNSS_time;
-        
+        curGPSSec = gnss_msg->GNSS_Raws[0].GNSS_time;  // 提取GNSS和LEO数据的时间戳，并将当前GPS秒设置为GNSS消息的时间
         std::cout<<"gnss time1: " <<time0 <<"; gnss time 2: "<<time1<<std::endl; 
         std::cout<<"gnss_msg size:"<<gnss_msg->GNSS_Raws.size()<<", "<<leo_msg->GNSS_Raws.size()<<std::endl;
-
         /* Combine LEO and GNSS msg to one topic*/
-        nlosexclusion::GNSS_Raw_Array gnss_leo_msg = *gnss_msg;
+        nlosexclusion::GNSS_Raw_Array gnss_leo_msg = *gnss_msg; // 1.函数核心，复制GNSS消息作为基础
+        // 2.将LEO卫星数据追加到GNSS数据数组的末尾
         gnss_leo_msg.GNSS_Raws.insert(gnss_leo_msg.GNSS_Raws.end(), leo_msg->GNSS_Raws.begin(), leo_msg->GNSS_Raws.end());
-        for (int i=0; i<gnss_leo_msg.GNSS_Raws.size();i++)
+        for (int i=0; i<gnss_leo_msg.GNSS_Raws.size();i++) // 3.更新每条记录中的卫星总数
         {
             gnss_leo_msg.GNSS_Raws[i].total_sv = gnss_leo_msg.GNSS_Raws.size();
         }
         std::cout<<" GNSS_LEO Raw msg size is" << gnss_leo_msg.GNSS_Raws.size() << std::endl;
-        gnss_leo_msg.header.stamp = gnss_msg->header.stamp;
+        gnss_leo_msg.header.stamp = gnss_msg->header.stamp; // 设置消息的时间戳
             
         /* save the data */
-        gnss_leo_raw_map[curGPSSec] = gnss_leo_msg;
-        
-        pubRoverGNSSRaw.publish(gnss_leo_msg);
+        gnss_leo_raw_map[curGPSSec] = gnss_leo_msg; // 将合并后的数据保存到gnss_leo_raw_map映射表中
+        pubRoverGNSSRaw.publish(gnss_leo_msg);      // 并发布合并后的消息
         if(curGPSSec>end_gps_sec)
         {
             finishGNSSReader = true;
             std::cout<< " you can play the bag file now!  " << gnss_leo_raw_map.size()<<std::endl;
         }
-        
         /* release the lock */
         m_gnss_raw_mux.unlock();
     }
@@ -222,25 +204,19 @@ public:
     void gnss_leo_station_raw_msg_callback(const boost::shared_ptr<const nlosexclusion::GNSS_Raw_Array>& gnss_msg,
         const boost::shared_ptr<const nlosexclusion::GNSS_Raw_Array>& leo_msg)
         {
-            std::lock_guard<std::mutex> lock(m_gnss_raw_mux);
-    
-            
+            std::lock_guard<std::mutex> lock(m_gnss_raw_mux);         
             if(finishGNSSReader) 
             {
                 //m_gnss_raw_mux.unlock();
                 return;
             }
-    
             hasNewData = true;
             gnss_frame++;
             double time0 = gnss_msg->GNSS_Raws[0].GNSS_time;
             double time1 = leo_msg->GNSS_Raws[0].GNSS_time;
-    
             curGPSSec = gnss_msg->GNSS_Raws[0].GNSS_time;
-            
-            std::cout<<"gnss time1: " <<time0 <<"; gnss time 2: "<<time1<<std::endl; 
+            std::cout<<"gnss time1: " <<time0 <<"; gnss time 2: "<<time1<<std::endl;
             std::cout<<"gnss_msg size:"<<gnss_msg->GNSS_Raws.size()<<", "<<leo_msg->GNSS_Raws.size()<<std::endl;
-    
             /* Combine LEO and GNSS msg to one topic*/
             nlosexclusion::GNSS_Raw_Array gnss_leo_msg = *gnss_msg;
             gnss_leo_msg.GNSS_Raws.insert(gnss_leo_msg.GNSS_Raws.end(), leo_msg->GNSS_Raws.begin(), leo_msg->GNSS_Raws.end());
@@ -249,18 +225,15 @@ public:
                 gnss_leo_msg.GNSS_Raws[i].total_sv = gnss_leo_msg.GNSS_Raws.size();
             }
             std::cout<<" GNSS_LEO Raw msg size is" << gnss_leo_msg.GNSS_Raws.size() << std::endl;
-            gnss_leo_msg.header.stamp = gnss_msg->header.stamp;
-                
+            gnss_leo_msg.header.stamp = gnss_msg->header.stamp;   
             /* save the data */
-            gnss_leo_raw_map[curGPSSec] = gnss_leo_msg;
-            
-            pubStationGNSSRaw.publish(gnss_leo_msg);
+            gnss_leo_raw_map[curGPSSec] = gnss_leo_msg; 
+            pubStationGNSSRaw.publish(gnss_leo_msg); // 通过ROS发布合并后的GNSS-LEO消息。
             if(curGPSSec>end_gps_sec)
             {
                 finishGNSSReader = true;
                 std::cout<< " you can play the bag file now!  " << gnss_leo_raw_map.size()<<std::endl;
             }
-            
             /* release the lock */
             m_gnss_raw_mux.unlock();
         }
