@@ -133,7 +133,7 @@ public:
         if (!ros::param::get("~gnss_fgo_path", gnss_fgo_path))
         {
             std::cerr << "ROS parameter 'gnss_fgo_path' of psr_doppler_fusion is not set!" << std::endl;
-            gnss_fgo_path = "./GNSS_only_FGO_trajectoryllh_psr_dop_fusion.csv"; // 默认路径是当前目录下的GNSS_only_FGO_trajectoryllh_psr_dop_fusion.csv文件
+            gnss_fgo_path = "./GNSS_only_FGO_trajectoryllh_psr_dop_fusion.csv"; // 默认路径是当前目录下的GNSS_only_FGO_trajectoryllh_psr_dop_fusion.csv文件，这里的路径可能是要改的
         }
         std::cout << "gnss_fgo_path-> " << gnss_fgo_path << std::endl;
         /* thread for factor graph optimization */

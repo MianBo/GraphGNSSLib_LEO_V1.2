@@ -82,7 +82,7 @@ class gnssSinglePointPositioning
 
     // ros subscriber
     ros::Subscriber gnss_raw_sub; // 订阅者，订阅GNSS原始观测数据
-    ros::Subscriber leo_raw_sub;//add by Yixin，从这里开始就添加LEO？
+    ros::Subscriber leo_raw_sub;//add by Yixin，从这里开始就添加LEO？实际上也没用上
     ros::Publisher pub_WLS, pub_FGO; // 发布者，发布WLS和FGO的定位结果
     std::queue<nlosexclusion::GNSS_Raw_ArrayConstPtr> gnss_raw_buf; // GNSS原始数据的队列缓冲区
     std::map<double, nlosexclusion::GNSS_Raw_Array> gnss_raw_map; // 按时间戳映射的GNSS原始数据容器

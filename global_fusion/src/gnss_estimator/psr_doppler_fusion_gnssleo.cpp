@@ -75,43 +75,33 @@
 
 class psr_doppler_fusion
 {
-    ros::NodeHandle nh;
+    ros::NodeHandle nh; // ROS句柄
 
     /* ros subscriber */
-    ros::Publisher pub_WLSENU, pub_FGOENU, pub_global_path, pub_fgo_llh,pub_FGOECEF;
+    ros::Publisher pub_WLSENU, pub_FGOENU, pub_global_path, pub_fgo_llh,pub_FGOECEF; // 发布WLSENU、FGOENU、全局路径、FGO经纬高和FGOECEF坐标
     std::map<double, nlosexclusion::GNSS_Raw_Array> gnss_raw_map;
-    std::map<double, nav_msgs::Odometry> doppler_map;
-
+    std::map<double, nav_msgs::Odometry> doppler_map; // 使用map存储GNSS原始数据和多普勒测速数据，按时间戳索引
     GNSS_Tools m_GNSS_Tools; // utilities
-
     /* subscriber */
-    std::unique_ptr<message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>> gnss_raw_array_sub;
-    std::unique_ptr<message_filters::Subscriber<nav_msgs::Odometry>> doppler_sub;
-    std::unique_ptr<message_filters::TimeSynchronizer<nlosexclusion::GNSS_Raw_Array, nav_msgs::Odometry>> syncdoppler2GNSSRaw;
-
+    std::unique_ptr<message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>> gnss_raw_array_sub; // 订阅GNSS原始数据数组消息
+    std::unique_ptr<message_filters::Subscriber<nav_msgs::Odometry>> doppler_sub; // 订阅多普勒测速消息
+    std::unique_ptr<message_filters::TimeSynchronizer<nlosexclusion::GNSS_Raw_Array, nav_msgs::Odometry>> syncdoppler2GNSSRaw; // 时间同步器，用于同步GNSS原始数据和多普勒数据
     /* thread lock for data safe */
     std::mutex m_gnss_raw_mux;
-
     /* thread for data processing */
     std::thread optimizationThread;
-
-    int gnss_frame = 0;
-    Eigen::Matrix<double, 3,1> ENU_ref;
-    int slidingWindowSize = 10000000; // ? epoch measurements 150 100000
+    int gnss_frame = 0; // 计数器，用于跟踪处理的GNSS数据帧数。
+    Eigen::Matrix<double, 3,1> ENU_ref; // 存储ENU坐标系的参考点（经度、纬度、高度）
+    int slidingWindowSize = 10000000; // ? epoch measurements 150 100000 // 滑动窗口大小，用于因子图优化中的批量处理。
     bool hasNewData = false;
-
     /* latest state in ENU */
-    Eigen::Matrix<double ,3,1> FGOENULatest;
+    Eigen::Matrix<double ,3,1> FGOENULatest;  // 存储最新的因子图优化结果在ENU坐标系中的位置。
     /* latest state in ECEF */
-    Eigen::Matrix<double ,3,1> FGOECEFLatest;
-
-
+    Eigen::Matrix<double ,3,1> FGOECEFLatest; // 存储最新的因子图优化结果在ECEF坐标系中的位置。
     /* path in ENU */
-    nav_msgs::Path fgo_path;
-
+    nav_msgs::Path fgo_path; // 存储因子图优化结果的轨迹路径
     /* log path */
-    std::string gnssleo_fgo_path;
-
+    std::string gnssleo_fgo_path; // 存储日志文件路径，用于保存处理结果
 
 private:
     // std::unique_ptr<factor_graph> factor_graph_ptr_; // factor graph ptr
@@ -135,32 +125,34 @@ public:
     psr_doppler_fusion()
     {
         /* setup gnssleo_fgo_path */
-        ros::param::get("~gnssleo_fgo_path", gnssleo_fgo_path);
+        ros::param::get("~gnssleo_fgo_path", gnssleo_fgo_path); // 尝试从ROS参数服务器获取~gnssleo_fgo_path参数值
         if (!ros::param::get("~gnssleo_fgo_path", gnssleo_fgo_path))
         {
             LOG(ERROR) << "gnssleo_fgo_path not set, using default path";
-            gnssleo_fgo_path = "./GNSSLEO_FGO_trajectoryllh_psr_dop_fusion.csv"; // change to your path
+            gnssleo_fgo_path = "./GNSSLEO_FGO_trajectoryllh_psr_dop_fusion.csv"; // change to your path // 如果参数未设置，则使用默认路径，不过这里要改吗？
         }
-        std::cout << "gnssleo_fgo_path-> "<< gnssleo_fgo_path<< std::endl;
+        std::cout << "gnssleo_fgo_path-> "<< gnssleo_fgo_path<< std::endl; // 通过日志和标准输出显示最终使用的路径
         /* thread for factor graph optimization */
         optimizationThread = std::thread(&psr_doppler_fusion::solveOptimization, this);
-        
-        pub_WLSENU = nh.advertise<nav_msgs::Odometry>("WLSGoGPS_GNSSLEO", 100); // 
-        pub_FGOENU = nh.advertise<nav_msgs::Odometry>("FGO_GNSSLEO", 100); //  
-        pub_FGOECEF = nh.advertise<nav_msgs::Odometry>("PsrDopp_FGO_GNSSLEO_ECEF", 100); // 
-        pub_fgo_llh = nh.advertise<sensor_msgs::NavSatFix>("fgo_llh_GNSSLEO", 100);
+        // 创建四个ROS发布者，用于发布不同格式的定位结果
+        pub_WLSENU = nh.advertise<nav_msgs::Odometry>("WLSGoGPS_GNSSLEO", 100); // 发布加权最小二乘(WLS)解算的ENU坐标系结果
+        pub_FGOENU = nh.advertise<nav_msgs::Odometry>("FGO_GNSSLEO", 100); //  发布因子图优化(FGO)的ENU坐标系结果
+        pub_FGOECEF = nh.advertise<nav_msgs::Odometry>("PsrDopp_FGO_GNSSLEO_ECEF", 100); // 发布因子图优化的ECEF坐标系结果
+        pub_fgo_llh = nh.advertise<sensor_msgs::NavSatFix>("fgo_llh_GNSSLEO", 100); // 发布因子图优化的经纬高(LLH)坐标结果
 
         //gnss_raw_array_sub.reset(new message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>(nh, "/gnss_preprocessor_node/GNSSPsrCarRov1", 10000));// GNSS only
         //doppler_sub.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh, "/gnss_preprocessor_node/GNSSDopVelRov1", 10000));// GNSS only
+        // 订阅GNSS+LEO组合的伪距观测数据，主题为/gnss_leo_msg_combination_node/GNSS_LEO_PsrCarRov
         gnss_raw_array_sub.reset(new message_filters::Subscriber<nlosexclusion::GNSS_Raw_Array>(nh, "/gnss_leo_msg_combination_node/GNSS_LEO_PsrCarRov", 10000));// GNSS+LEO
+        // 订阅多普勒速度数据，主题为/psr_spp_gnssleo_node/GNSS_LEO_DopVelRov
         doppler_sub.reset(new message_filters::Subscriber<nav_msgs::Odometry>(nh, "/psr_spp_gnssleo_node/GNSS_LEO_DopVelRov", 10000));// GNSS+LEO
+        // 使用ROS的TimeSynchronizer实现时间同步，确保GNSS和多普勒数据在时间上对齐
         syncdoppler2GNSSRaw.reset(new message_filters::TimeSynchronizer<nlosexclusion::GNSS_Raw_Array, nav_msgs::Odometry>(*gnss_raw_array_sub, *doppler_sub, 10000));
-
+        // 注册回调函数gnssraw_doppler_msg_callback，当同步数据到达时调用该函数处理
         syncdoppler2GNSSRaw->registerCallback(boost::bind(&psr_doppler_fusion::gnssraw_doppler_msg_callback,this, _1, _2));
-
+        // 创建一个用于发布完整轨迹路径的发布者，主题为/GNSS_LEO_FGOGlobalPath。
         pub_global_path = nh.advertise<nav_msgs::Path>("/GNSS_LEO_FGOGlobalPath", 100); // 
-        
-        /* reference point for ENU calculation */
+        /* reference point for ENU calculation */ // 设置ENU(东-北-天)坐标系的参考点，使用全局变量ref_lon(经度)、ref_lat(纬度)和ref_alt(高度)作为参考坐标。
         ENU_ref<< ref_lon, ref_lat, ref_alt;
 
     }
@@ -207,7 +199,6 @@ public:
                 /* initialize factor graph parameters */
                 factor_graph.initializeFactorGraphParas();
 
-                
 
                 /* initialize the previous optimzied states */
                 factor_graph.initializeOldGraph();
@@ -242,14 +233,14 @@ public:
                 /* get the latest state in ENU*/
                 FGOECEFLatest = factor_graph.getLatestStateECEF();
                 /* publish the latest state in ECEF */
-                nav_msgs::Odometry odometry_ecef;
+                nav_msgs::Odometry odometry_ecef; // 创建了一个nav_msgs::Odometry类型的消息，用于发布接收机在ECEF（地心地固坐标系）坐标系下的位置。
                 odometry_ecef.header.frame_id = "glio_leo";
-                odometry_ecef.child_frame_id = "glio_leo";
+                odometry_ecef.child_frame_id = "glio_leo"; // frame_id和child_frame_id都设置为"glio_leo"，表示这是GNSS/LEO融合定位结果
                 odometry_ecef.pose.pose.position.x = FGOECEFLatest(0);
                 odometry_ecef.pose.pose.position.y = FGOECEFLatest(1);
-                odometry_ecef.pose.pose.position.z = FGOECEFLatest(2);
+                odometry_ecef.pose.pose.position.z = FGOECEFLatest(2); // 将最新的ECEF坐标位置（存储在FGOECEFLatest向量中）赋值给Odometry消息的position字段。
                 std::cout<< "FGOECEFLatest-> "<< std::endl<< FGOECEFLatest<< std::endl;
-                pub_FGOECEF.publish(odometry_ecef);
+                pub_FGOECEF.publish(odometry_ecef); // 后通过pub_FGOECEF发布这个Odometry消息。这使得其他ROS节点可以订阅并使用这个定位结果
 
                 /* publish the lastest state in factor graph */
                 factor_graph.printLatestStateENU();
