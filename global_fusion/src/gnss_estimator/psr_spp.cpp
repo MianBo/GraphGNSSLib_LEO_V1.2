@@ -14,7 +14,7 @@
 #include <iostream>
 #include <string>  
 #include <fstream>
-#include<sstream>
+#include <sstream>
 #include <stdlib.h>
 #include <iomanip>
 

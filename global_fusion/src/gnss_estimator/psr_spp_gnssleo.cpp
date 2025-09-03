@@ -107,7 +107,6 @@ static const char rcsid[]="$Id:$";
 #define D2R         (M_PI/180.0) /* deg to rad */
 #define R2D         (180.0/M_PI) /* rad to deg */
 
-
 GNSS_Tools m_GNSS_Tools; // utilities
 
 
@@ -127,8 +126,6 @@ class gnssSinglePointPositioning
     ros::Publisher pub_WLS_ECEF = nh.advertise<nav_msgs::Odometry>("/psr_spp_gnssleo_node/WLS_spp_GNSS_LEO_ECEF", 100); //
     ros::Publisher pub_velocity_from_doppler = nh.advertise<nav_msgs::Odometry>("/psr_spp_gnssleo_node/GNSS_LEO_DopVelRov", 20000); //r;
     //ros::Publisher pub_velocity_from_doppler = nh.advertise<nav_msgs::Odometry>("/psr_spp_gnssleo_node/LEODopVelRov", 20000); //r;
-    
-
     
     //std::queue<nlosexclusion::GNSS_Raw_ArrayConstPtr> gnss_leo_raw_buf;
     std::map<double, nlosexclusion::GNSS_Raw_Array> gnss_leo_raw_buf;

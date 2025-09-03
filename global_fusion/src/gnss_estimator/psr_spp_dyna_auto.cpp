@@ -30,7 +30,7 @@
 // google eigen
 #include <Eigen/Eigen>
 #include <Eigen/Dense>
-#include<Eigen/Core>
+#include <Eigen/Core>
 
 // google implements commandline flags processing.
 #include <gflags/gflags.h>
@@ -289,7 +289,7 @@ public:
                 int length = gnss_raw_map.size();
                 // double state_array[length][5]; // ECEF_x, ECEF_y, ECEF_z, ECEF_gps_clock_bias, ECEF_beidou_clock_bias
                 // std::vector<double*> parameter_blocks;
-                std::vector<double*> state_array;
+                std::vector<double*> state_array; // 区分与psr_ppp.cpp，这里的数组是动态数组指针向量
                 state_array.reserve(length);
 
                 for(int i = 0; i < length; i++)
